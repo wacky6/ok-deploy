@@ -2,6 +2,10 @@
 
 FILE=tinc-1.1pre14.tar.gz
 DIR=`basename $FILE .tar.gz`
+PREFIXES="
+--prefix=/ \
+--exec-prefix=/usr \
+"
 
 CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
@@ -13,7 +17,7 @@ cd /tmp
 wget http://tinc-vpn.org/packages/$FILE
 tar xf $FILE
 
-( cd $DIR ; ./configure --prefix=/usr && make install $MAKEOPTS )
+( cd $DIR ; ./configure $PREFIXES && make clean && make install $MAKEOPTS )
 
 cat > /etc/init.d/tinc-1.1 << _EOF_
 #! /bin/sh
