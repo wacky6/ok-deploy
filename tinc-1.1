@@ -19,7 +19,7 @@ tar xf $FILE
 
 ( cd $DIR ; ./configure $PREFIXES && make clean && make install $MAKEOPTS )
 
-cat > /etc/init.d/tinc-1.1 << _EOF_
+cat > /etc/init.d/tinc-1.1 << '_EOF_'
 #! /bin/sh
 #
 ### BEGIN INIT INFO
@@ -166,7 +166,7 @@ _EOF_
 
 chmod +x /etc/init.d/tinc-1.1
 
-cat > /etc/default/tinc-1.1 << _EOF_
+cat > /etc/default/tinc-1.1 << '_EOF_'
 # Extra options to be passed to tincd.
 # EXTRA="-d"
 
