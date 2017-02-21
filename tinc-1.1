@@ -1,0 +1,20 @@
+#!/bin/bash
+
+FILE=tinc-1.1pre14.tar.gz
+DIR=`basename $FILE .tar.gz`
+
+CORES=`grep -c processor < /proc/cpuinfo`
+MAKE_OPTS=-j${CORES}
+INSTALL='apt install --no-install-recommends -y'
+
+$INSTALL ncurses-base ncurses-bin libncurses-dev liblzo2-2 liblzo2-dev
+
+cd /tmp
+wget http://tinc-vpn.org/packages/$FILE
+tar xf $FILE
+
+( cd $DIR ; ./configure && make install $MAKEOPTS )
+
+echo "**** Complete ****"
+echo "path: $( which tincd )"
+tincd --version | head -n1
