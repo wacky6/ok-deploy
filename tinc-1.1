@@ -2,10 +2,7 @@
 
 FILE=tinc-1.1pre14.tar.gz
 DIR=`basename $FILE .tar.gz`
-PREFIXES="
---prefix=/ \
---exec-prefix=/usr \
-"
+PREFIXES="--prefix=/usr --exec-prefix=/usr --sysconfdir=/etc --localstatedir=/var"
 
 CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
