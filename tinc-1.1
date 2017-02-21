@@ -15,7 +15,7 @@ tar xf $FILE
 
 ( cd $DIR ; ./configure --prefix=/usr && make install $MAKEOPTS )
 
-cat > /etc/init.d/tinc-1.1 < _EOF_
+cat > /etc/init.d/tinc-1.1 << _EOF_
 #! /bin/sh
 #
 ### BEGIN INIT INFO
@@ -39,8 +39,8 @@ cat > /etc/init.d/tinc-1.1 < _EOF_
 #. /lib/lsb/init-functions
 
 DAEMON="/usr/sbin/tincd"
-NAME="tinc"
-DESC="tinc daemons"
+NAME="tinc-1.1"
+DESC="tinc-1.1 daemons"
 TCONF="/etc/tinc"
 NETSFILE="$TCONF/nets.boot"
 NETS=""
@@ -158,9 +158,11 @@ esac
 
 exit 0
 
-_EOF
+_EOF_
 
-cat > /etc/default/tinc-1.1 < _EOF_
+chmod +x /etc/init.d/tinc-1.1
+
+cat > /etc/default/tinc-1.1 << _EOF_
 # Extra options to be passed to tincd.
 # EXTRA="-d"
 
