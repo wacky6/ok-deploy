@@ -325,7 +325,7 @@ _ss_libev() {
 		libpcre3-dev zlib1g-dev libudns-dev libev4 libev-dev libmbedtls-dev
 	# libsodium
 	git clone --branch master --depth 1 https://github.com/jedisct1/libsodium.git
-	( cd libsodium ; ./autogen.sh && ./configure && make ${MAKE_OPTS} install )
+	( cd libsodium ; ./autogen.sh && ./configure && make ${MAKE_OPTS} install && ldconfig )
 	rm -r libsodium
 	# ss-libev -> debian package
 	git clone --branch v2.6.3 --depth 1 https://github.com/shadowsocks/shadowsocks-libev
