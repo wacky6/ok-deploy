@@ -11,7 +11,7 @@ CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
 INSTALL='apt install --no-install-recommends -y'
 
-$INSTALL ncurses-base ncurses-bin libncurses-dev liblzo2-2 liblzo2-dev
+$INSTALL readline-common libreadline-dev ncurses-base ncurses-bin libncurses-dev liblzo2-2 liblzo2-dev
 
 cd /tmp
 wget http://tinc-vpn.org/packages/$FILE
