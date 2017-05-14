@@ -1,0 +1,13 @@
+#!/bin/sh
+
+UPDATE='apt update'
+INSTALL='apt install -y'
+
+$UPDATE
+$INSTALL \
+    build-essential \
+	vim \
+	curl wget aria2 \
+	iftop iotop glances \
+	traceroute mtr
+
