@@ -67,7 +67,7 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
-    servername \$SNI_NAME;
+    server_name \$SNI_NAME;
 
     ssl_certificate /root/tls/\$APP-cert.pem;
     ssl_certificate_key /root/tls/\$APP-key.pem;
