@@ -86,6 +86,13 @@ server {
 }
 _EOF_
 
+# gzip text-based data
+cat > /etc/nginx/conf.d/gzip.conf <<-_EOF_
+gzip_vary on;
+gzip_proxied expired no-cache no-store private auth;
+gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript;
+_EOF_
+
 # restart
 systemctl enable nginx
 service nginx restart
