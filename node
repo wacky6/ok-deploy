@@ -1,0 +1,24 @@
+#!/bin/bash
+
+UPDATE="apt update -y"
+INSTALL="apt install -y"
+CORES=`grep -c processor < /proc/cpuinfo`
+MAKE_OPTS=-j${CORES}
+
+$UPDATE
+$INSTALL python curl build-essential
+
+NODE_LATEST_LTS=`curl https://nodejs.org/dist/index.json 2>/dev/null | tac | grep -oe '"version":"\(v[.0-9]\+\)"' | grep -oe 'v[.0-9]\+' | sort -rV | head -n1`
+NODE_VER=${NODE_LATEST_LTS}
+NODE_ARCHIVE=node-${NODE_VER}
+
+curl -o- -vL "https://nodejs.org/dist/${NODE_VER}/${NODE_ARCHIVE}.tar.gz" | tar xzv
+( cd ${NODE_ARCHIVE} ; ./configure && make ${MAKE_OPTS} install )
+rm -rf ${NODE_ARCHIVE}
+
+# yarn
+curl -o- -vL https://yarnpkg.com/install.sh | bash
+
+# pm2
+npm i -g pm2
+pm2 startup
