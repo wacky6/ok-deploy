@@ -26,7 +26,7 @@ cat > /etc/nginx/tls-modern.incl <<-_EOF_
 add_header X-Frame-Options DENY always;
 add_header X-Content-Type-Options nosniff always;
 add_header X-XSS-Protection "1; mode=block" always;
-add_header Strict-Transport-Security max-age=15768000 always;
+add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
 add_header Referrer-Policy no-referrer-when-downgrade always;
 
 ssl_session_timeout 1d;
