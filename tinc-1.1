@@ -13,6 +13,8 @@ $INSTALL build-essential zlib1g-dev libssl-dev \
          ncurses-base ncurses-bin libncurses-dev \
          liblzo2-2 liblzo2-dev
 
+PREV_WD=$( pwd )
+
 cd /tmp
 wget http://tinc-vpn.org/packages/$FILE
 tar xf $FILE
@@ -168,3 +170,5 @@ _EOF_
 echo "**** Complete ****"
 echo "path: $( which tincd )"
 tincd --version | head -n1
+
+cd $PREV_WD
