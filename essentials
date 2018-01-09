@@ -19,3 +19,6 @@ update-locale LC_ALL=en_US.UTF-8
 # unattended upgrades
 $INSTALL unattended-upgrades
 dpkg-reconfigure -f noninteractive unattended-upgrades
+# upgrade all packages, because I can't be bothered with manual labor
+UU_CONF=/etc/apt/apt.conf.d/50unattended-upgrades
+sed '/Unattended-Upgrade::Allowed-Origins/a \\t"*:*";' $UU_CONF > $UU_CONF 
