@@ -28,6 +28,7 @@ Ubuntu server deploy scripts that suits wacky's tastes
 * https redirection + ACME responder at `/var/acme-http`
 * compose with [acme.sh](https://github.com/Neilpang/acme.sh)
 * {tls-modern, proxy-headers} .incl for composable site configs
+* <Caution>: will set HSTS includeSubdomains preload, USE AT YOUR OWN RISK
 
 #### docker-ce
 * docker community edition
