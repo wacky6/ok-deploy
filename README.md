@@ -38,10 +38,11 @@ Ubuntu server deploy scripts that suits wacky's tastes
 * tinc 1.1 from source
 * compose with [tinc-config](https://github.com/wacky6/tinc-config)
 
-#### node-lts
-* node latest-lts from source
+#### node / node-lts
+* node latest / latest-lts from source
 * pm2 (from npm)
 * swap addition (if host memory is small)
+* yarn!
 
 #### zsh
 * zsh + [wacky's zshrc](https://github.com/wacky6/my_zshrc)
