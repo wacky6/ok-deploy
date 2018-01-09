@@ -9,6 +9,7 @@ Ubuntu server deploy scripts that suits wacky's tastes
 #### essentials (run this first!)
 * build-essentials
 * vim
+* unattended-upgrades for all packages
 * [Monitors]: iftop, iotop, glances
 * [Network]: traceroute, mtr
 
