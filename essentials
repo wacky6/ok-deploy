@@ -2,14 +2,17 @@
 
 UPDATE='apt update'
 INSTALL='apt install -y'
+UPGRADE='apt upgrade -y'
+AUTOCLEAN='apt autoremove -y'
 
 $UPDATE
 $INSTALL \
     build-essential \
 	vim \
 	curl wget aria2 \
-	iftop iotop glances \
+	iftop iotop glances htop nethogs iperf3 \
 	traceroute mtr
+$UPGRADE
 
 # Locale
 locale-gen en_US.UTF-8
