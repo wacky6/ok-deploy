@@ -8,10 +8,10 @@ AUTOCLEAN='apt autoremove -y'
 $UPDATE
 $INSTALL \
     build-essential \
-	vim \
-	curl wget aria2 \
-	iftop iotop glances htop nethogs iperf3 \
-	traceroute mtr
+    vim \
+    curl wget aria2 \
+    iftop iotop glances htop nethogs iperf3 \
+    traceroute mtr
 $UPGRADE
 
 # Locale
