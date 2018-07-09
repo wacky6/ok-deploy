@@ -8,7 +8,8 @@ CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
 INSTALL='apt install --no-install-recommends -y'
 
-$INSTALL build-essential zlib1g-dev libssl-dev \
+$INSTALL build-essential git wget \
+         zlib1g-dev libssl-dev \
          readline-common libreadline-dev \
          ncurses-base ncurses-bin libncurses-dev \
          liblzo2-2 liblzo2-dev
@@ -16,7 +17,7 @@ $INSTALL build-essential zlib1g-dev libssl-dev \
 PREV_WD=$( pwd )
 
 cd /tmp
-wget http://tinc-vpn.org/packages/$FILE
+wget https://tinc-vpn.org/packages/$FILE
 tar xf $FILE
 
 ( cd $DIR ; ./configure $PREFIXES && make clean && make install $MAKEOPTS )
@@ -164,6 +165,58 @@ cat > /etc/default/tinc-1.1 << '_EOF_'
 # (pointed by /bin/sh) documentation for ulimit. You probably want to raise the
 # max locked memory value if using both --mlock and --user flags.
 # LIMITS="-l 1024"
+_EOF_
+
+# check pubkey, it needs to be tinc-config's deployment key
+if [ ! -f /root/.ssh/id_rsa.pub ]; then
+    echo "Pubkey does not exist, generating..."
+    ssh-keygen -f /root/.ssh/id_rsa -N ''
+    echo ""
+else
+    echo "Pubkey found."
+fi
+
+echo "###### Add the following to tinc-config deployment key (write access)"
+echo ""
+cat /root/.ssh/id_rsa.pub
+echo ""
+echo "###### Press enter when complete"
+read -p "  Waiting for Enter > "
+
+# pull in overlay config
+echo "Pulling tinc-config..."
+mkdir -p /etc/tinc
+( cd /etc/tinc; \
+  git clone git@github.com:wacky6/tinc-config --branch overlay --depth 1 overlay;
+)
+
+# start tinc-config's config script
+while true; do
+    echo ""
+    echo "###### Run tinc-config..."
+    ( cd /etc/tinc/overlay; ./config.sh )
+    echo "###### Is the above configuration correct?"
+    read -p "  yes or no > " resp
+    if [[ $resp =~ y|Y|yes ]]; then
+        echo "Config confirmed."
+		break
+    fi
+done
+
+# push tinc to upstream
+echo "###### Pushing to upstream"
+( cd /etc/tinc/overlay; \
+  git config user.email "$(hostname)-admin@wacky.one"; \
+  git config user.name "$(hostname)"; \
+  git add hosts/; \
+  git commit -m "add $( hostname )"; \
+  git push origin overlay;
+)
+
+# add overlay to default network
+echo "###### Add overlay to default networks"
+cat >> /etc/tinc/nets.boot << '_EOF_'
+overlay
 _EOF_
 
 
