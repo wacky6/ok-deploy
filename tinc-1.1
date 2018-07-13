@@ -219,6 +219,9 @@ cat >> /etc/tinc/nets.boot << '_EOF_'
 overlay
 _EOF_
 
+# auto start
+systemctl enable tinc-1.1
+service tinc-1.1 start
 
 echo "**** Complete ****"
 echo "path: $( which tincd )"
