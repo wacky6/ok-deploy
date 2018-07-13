@@ -18,6 +18,15 @@ $UPDATE
 
 $INSTALL docker-ce
 
+# add docker ps/image format
+mkdir -p /root/.docker/
+cat > /root/.docker/docker.json << _EOF_
+{
+  "psFormat": "table {{.Names}}\\t{{.Image}}\\t{{.RunningFor}} ago\\t{{.Status}}\\t{{.Command}}",
+  "imagesFormat": "table {{.Repository}}\\t{{.Tag}}\\t{{.ID}}\\t{{.Size}}"
+}
+_EOF_
+
 systemctl enable docker
 service docker start
 
