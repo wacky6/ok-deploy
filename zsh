@@ -4,8 +4,8 @@ UPDATE="apt update -y"
 INSTALL="apt install -y"
 
 $UPDATE
-$INSTALL zsh git curl
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+$INSTALL zsh git curl sed
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh | sed '/env zsh/c\\')"
 
 # nuke oh-my-zsh's zshrc, replace it with mine
 # assume target is root
