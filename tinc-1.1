@@ -1,230 +1,107 @@
 #!/bin/bash
 
-FILE=tinc-1.1pre15.tar.gz
+FILE=tinc-1.1pre17.tar.gz
 DIR=`basename $FILE .tar.gz`
 PREFIXES="--prefix=/usr --exec-prefix=/usr --sysconfdir=/etc --localstatedir=/var"
 
 CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
 INSTALL='apt install --no-install-recommends -y'
+REMOVE='apt remove -y'
+AUTOREMOVE='apt autoremove -y'
 
-$INSTALL build-essential git wget \
+SYSTEMD_UNIT_PATH=/usr/lib/systemd/system
+
+$INSTALL build-essential git curl \
          zlib1g-dev libssl-dev \
          readline-common libreadline-dev \
          ncurses-base ncurses-bin libncurses-dev \
-         liblzo2-2 liblzo2-dev
+         liblzo2-2 liblzo2-dev sed texinfo
 
-PREV_WD=$( pwd )
+curl https://tinc-vpn.org/packages/$FILE | tar xz -C /tmp
 
-cd /tmp
-wget https://tinc-vpn.org/packages/$FILE
-tar xf $FILE
+( cd /tmp/$DIR ; \
+  CFLAGS='-march=native' ./configure $PREFIXES --with-systemd=$SYSTEMD_UNIT_PATH \
+  && make $MAKEOPTS \
+  && make install \
+  && $REMOVE texinfo \
+  && $AUTOREMOVE \
+)
 
-( cd $DIR ; ./configure $PREFIXES && make clean && make install $MAKEOPTS )
-
-cat > /etc/init.d/tinc-1.1 << '_EOF_'
-#! /bin/sh
-#
-### BEGIN INIT INFO
-# Provides:          tinc-1.1
-# Required-Start:    $remote_fs $network
-# Required-Stop:     $remote_fs $network
-# Should-Start:      $syslog $named
-# Should-Stop:       $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Start tinc daemons
-# Description:       Create a file $NETSFILE (/etc/tinc/nets.boot),
-#                    and put all the names of the networks in there.
-#                    These names must be valid directory names under
-#                    $TCONF (/etc/tinc). Lines starting with a # will be
-#                    ignored in this file.
-### END INIT INFO
-#
-# Based on Lubomir Bulej's Redhat init script.
-
-#. /lib/lsb/init-functions
-
-DAEMON="/usr/sbin/tincd"
-NAME="tinc-1.1"
-DESC="tinc-1.1 daemons"
-TCONF="/etc/tinc"
-NETSFILE="$TCONF/nets.boot"
-NETS=""
-EXTRA_CONF='/etc/default/tinc-1.1'
-
-test -f $DAEMON || exit 0
-
-[ -r $EXTRA_CONF ] && . $EXTRA_CONF
-
-# foreach_net "what-to-say" action [arguments...]
-foreach_net() {
-  if [ ! -f $NETSFILE ] ; then
-    echo "Please create $NETSFILE."
-    exit 0
-  fi
-  echo -n "$1"
-  shift
-  egrep '^[ ]*[a-zA-Z0-9_-]+' $NETSFILE | while read net args; do
-    echo -n " $net"
-    "$@" $net $args
-  done
-  echo "."
-}
-
-setlimits() {
-  while [ $# -gt 0 ]; do
-    parm=$1 ; shift
-    if [ -n "$1" -a "${1#-}" = "$1" ]; then
-      value=$1 ; shift
-      ulimit $parm $value
-    else
-      ulimit $parm
-    fi
-  done
-}
-
-test -n "$LIMITS" && setlimits $LIMITS
-
-start() {
-  PIDFILE=/var/run/tinc.${1}.pid
-  LOGFILE=/var/log/tinc.${1}.log
-  $DAEMON $EXTRA --pidfile=$PIDFILE --logfile=$LOGFILE -n "$@"
-}
-
-stop() {
-  [ -f /var/run/tinc.$1.pid ] || return
-  read pid rest </var/run/tinc.$1.pid || return
-  kill -0 "$pid" 2>/dev/null || return
-
-  kill -s TERM $pid
-
-  i=0;
-  sleep 0.5
-
-  # Wait for the pidfile to disappear
-  while [ -f /var/run/tinc.$1.pid ]; do
-    # And check that there is an actual process running
-    kill -0 "$pid" 2>/dev/null || return
-
-    if [ $i = '10' ] ; then
-      # It's still alive, kill it again and give up
-      kill -s TERM $pid
-      break
-    else
-      echo -n "."
-      i=$(($i+1))
-    fi
-
-    sleep 0.5
-  done
-}
-
-reload() {
-  [ -f /var/run/tinc.$1.pid ] || return
-  read pid rest </var/run/tinc.$1.pid || return
-  kill -0 "$pid" 2>/dev/null || return
-  kill -s HUP $pid
-}
-
-restart() {
-  stop "$@"
-  start "$@"
-}
-
-case "$1" in
-  start)
-    foreach_net "Starting $DESC:" start
-  ;;
-  stop)
-    foreach_net "Stopping $DESC:" stop
-  ;;
-  reload|force-reload)
-    foreach_net "Reloading $DESC configuration:" reload
-  ;;
-  restart)
-    foreach_net "Restarting $DESC:" restart
-  ;;
-  *)
-    echo "Usage: /etc/init.d/$NAME {start|stop|reload|restart|force-reload}"
-    exit 1
-  ;;
-esac
-
-exit 0
-
-_EOF_
-
-chmod +x /etc/init.d/tinc-1.1
-
-cat > /etc/default/tinc-1.1 << '_EOF_'
-# Extra options to be passed to tincd.
-# EXTRA="-d"
-
-# Limits to be configured for the tincd process. Please read your shell
-# (pointed by /bin/sh) documentation for ulimit. You probably want to raise the
-# max locked memory value if using both --mlock and --user flags.
-# LIMITS="-l 1024"
-_EOF_
+# patch systemd unit file to include PID and log file
+if ! grep -qe '--pidfile=/var/run/tinc.%i.pid' ${SYSTEMD_UNIT_PATH}/tinc@.service ; then
+    sed -i '/^ExecStart=/ s/$/ --pidfile=\/var\/run\/tinc.%i.pid --logfile=\/var\/log\/tinc.%i.log/' ${SYSTEMD_UNIT_PATH}/tinc@.service
+    echo "systemd unit file patched."
+else
+    echo "systemd unit file already has pidfile"
+fi
 
 # check pubkey, it needs to be tinc-config's deployment key
 if [ ! -f /root/.ssh/id_rsa.pub ]; then
-    echo "Pubkey does not exist, generating..."
+    echo "pubkey does not exist, generating..."
     ssh-keygen -f /root/.ssh/id_rsa -N ''
     echo ""
 else
-    echo "Pubkey found."
+    echo "pubkey found."
 fi
 
-echo "###### Add the following to tinc-config deployment key (write access)"
-echo ""
-cat /root/.ssh/id_rsa.pub
-echo ""
-echo "###### Press enter when complete"
-read -p "  Waiting for Enter > "
-
-# pull in overlay config
-echo "Pulling tinc-config..."
-mkdir -p /etc/tinc
-( cd /etc/tinc; \
-  git clone git@github.com:wacky6/tinc-config --branch overlay --depth 1 overlay;
-)
-
-# start tinc-config's config script
-while true; do
+# generate config if necessary
+if [ ! -f /etc/tinc/overlay/tinc.conf ]; then
+    echo "###### Add the following to tinc-config deployment key (write access)"
     echo ""
-    echo "###### Run tinc-config..."
-    ( cd /etc/tinc/overlay; ./config.sh )
-    echo "###### Is the above configuration correct?"
-    read -p "  yes or no > " resp
-    if [[ $resp =~ y|Y|yes ]]; then
-        echo "Config confirmed."
-		break
-    fi
-done
+    cat /root/.ssh/id_rsa.pub
+    echo ""
+    echo "###### Press enter when complete"
+    read -p "  Waiting for Enter > "
 
-# push tinc to upstream
-echo "###### Pushing to upstream"
-( cd /etc/tinc/overlay; \
-  git config user.email "$(hostname)-admin@wacky.one"; \
-  git config user.name "$(hostname)"; \
-  git add hosts/; \
-  git commit -m "add $( hostname )"; \
-  git push origin overlay;
-)
+    # pull in overlay config
+    echo "Pulling tinc-config..."
+    mkdir -p /etc/tinc
+    ( cd /etc/tinc; \
+      git clone git@github.com:wacky6/tinc-config --branch overlay --depth 1 overlay;
+    )
 
-# add overlay to default network
-echo "###### Add overlay to default networks"
-cat >> /etc/tinc/nets.boot << '_EOF_'
-overlay
-_EOF_
+    # start tinc-config's config script
+    while true; do
+        echo ""
+        echo "###### Run tinc-config..."
+        ( cd /etc/tinc/overlay; ./config.sh )
+        echo "###### Is the above configuration correct?"
+        read -p "  yes or no > " resp
+        if [[ $resp =~ y|Y|yes ]]; then
+            echo "Config confirmed."
+        break
+        fi
+    done
 
-# auto start
-systemctl enable tinc-1.1
-service tinc-1.1 start
+    # push tinc to upstream
+    echo "###### Pushing to upstream"
+    ( cd /etc/tinc/overlay; \
+      git config user.email "$(hostname)-admin@wacky.one"; \
+      git config user.name "$(hostname)"; \
+      git add hosts/; \
+      git commit -m "add $( hostname )"; \
+      git push origin overlay;
+    )
+else
+    echo "tinc-config exists, skipping."
+fi
+
+
+if [ -f /etc/init.d/tinc-1.1 ]; then
+  echo "###### Mirgate Legacy Config"
+  systemctl stop tinc-1.1 || echo "tinc-1.1 service already stopped."
+  systemctl disable tinc-1.1 || echo "tinc-1.1 service already disabled."
+  rm -f /etc/init.d/tinc-1.1 && echo "tinc-1.1 init script removed."
+fi
+
+# enable and start tinc
+echo "###### Adding to systemd"
+systemctl daemon-reload
+systemctl enable tinc@overlay
+systemctl start tinc@overlay
 
 echo "**** Complete ****"
 echo "path: $( which tincd )"
 tincd --version | head -n1
 
-cd $PREV_WD
