@@ -10,7 +10,7 @@ $INSTALL \
     build-essential \
     vim \
     curl wget aria2 \
-    iftop iotop glances htop nethogs iperf3 \
+    iftop iotop htop nethogs iperf3 \
     traceroute mtr
 $UPGRADE
 
@@ -25,7 +25,7 @@ dpkg-reconfigure -f noninteractive unattended-upgrades
 
 # upgrade all packages, because I can't be bothered with manual labor
 UU_CONF=/etc/apt/apt.conf.d/50unattended-upgrades
-sed '/Unattended-Upgrade::Allowed-Origins/a \\t"*:*";' $UU_CONF > $UU_CONF 
+sed '/Unattended-Upgrade::Allowed-Origins/a \\t"*:*";' $UU_CONF > $UU_CONF
 
 # create /root/tls/ directory for certs
 mkdir -p /root/tls/
