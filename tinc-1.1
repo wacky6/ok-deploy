@@ -99,7 +99,8 @@ fi
 echo "###### Adding to systemd"
 systemctl daemon-reload
 systemctl enable tinc@overlay
-systemctl start tinc@overlay
+systemctl enable tinc
+systemctl start tinc
 
 echo "**** Complete ****"
 echo "path: $( which tincd )"
