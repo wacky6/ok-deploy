@@ -11,7 +11,8 @@ $INSTALL \
     vim \
     curl wget aria2 \
     iftop iotop htop nethogs iperf3 \
-    traceroute mtr
+    traceroute mtr \
+    jq sed iproute2
 $UPGRADE
 
 # Locale

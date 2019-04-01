@@ -1,0 +1,166 @@
+#!/bin/bash
+
+# acme.sh installation target
+ACME_SH=~/.acme.sh/acme.sh
+
+# check cloudflare account key
+# complaint if not exist
+
+CF_Endpoint=https://api.cloudflare.com/client/v4/
+
+if [ -z "${CF_Email}" -o -z "${CF_Key}" ] ; then
+    echo "CF_Email and CF_Key are not set"
+    echo "run the following script:"
+    echo ""
+    echo "  export CF_Email="
+    echo "  export CF_Key="
+    echo ""
+    exit 2
+fi
+
+# assume we are running on .wacky.one
+DOMAIN='wacky.one'
+FQDN=$( hostname )
+
+while [[ $FQDN != *.${DOMAIN} ]] ; do
+    printf "\n"
+    echo "<!> fqdn is ${FQDN}, does not match ${DOMAIN}"
+    echo "<!> please specify:"
+    printf "\n"
+    read -p "fqdn > " FQDN
+    printf "\n"
+done
+
+echo "fqdn: ${FQDN}"
+printf "\n"
+
+# check and install prerequisites
+which curl > /dev/null && echo 'found: curl' || ./essentials
+which jq > /dev/null && echo 'found: jq' || ./essentials
+which ip > /dev/null && echo 'found: iproute2' || ./essentials
+which nginx > /dev/null && echo 'found: nginx' || ./nginx
+which ${ACME_SH} > /dev/null && echo 'found: acme.sh' || ( curl -sL https://get.acme.sh | sh )
+printf "\n"
+
+### guess IPv4 IPv6 address
+IP4=$( ip -4 addr show scope global | grep -o '\(inet \)[^/]\+' -m 1 | cut -c 6- )
+IP6=$( ip -6 addr show scope global | grep -o '\(inet6 \)[^/]\+' -m 1 | cut -c 7- )
+
+[ -z $IP4 ] && echo "ipv4: not found" || echo "ipv4: ${IP4}"
+[ -z $IP6 ] && echo "ipv6: not found" || echo "ipv6: ${IP6}"
+printf "\n"
+
+cf_api="curl -s -H X-Auth-Email:${CF_Email} -H X-Auth-Key:${CF_Key} ${CF_Endpoint}"
+
+# probe zone id
+ZONE_ID=$( ${cf_api}zones\?name=${DOMAIN} | jq '.result[0].id' )
+
+if [ ${ZONE_ID} == null ] ; then
+    echo "zone_id: null"
+    exit 2
+else
+    ZONE_ID=$( echo $ZONE_ID | cut -d \" -f 2 )
+    echo "zone_id: ${ZONE_ID} / ${DOMAIN}"
+fi
+
+# create or update ipv4 / ipv6 record
+function set_dns () {
+    printf "\n"
+
+    TYPE=$1
+    ADDR=$2
+    RESULT_VAR=$3
+    RECORD_ID=$( ${cf_api}zones/${ZONE_ID}/dns_records\?type=${TYPE}\&name=${FQDN} | jq .result[0].id )
+
+    cf_dns_records="${cf_api}zones/${ZONE_ID}/dns_records"
+    type_json_arg="-H Content-Type:application/json --data-ascii"
+
+    PAYLOAD={\"type\":\"${TYPE}\",\"name\":\"${FQDN}\",\"content\":\"${ADDR}\"}
+
+    if [ null == $RECORD_ID ] ; then
+        echo "record_id: null"
+        declare $RESULT_VAR=$( ${cf_dns_records} -X POST ${type_json_arg} ${PAYLOAD} | jq .success )
+    else
+        RECORD_ID=$( echo $RECORD_ID | cut -d \" -f 2 )
+        echo "record_id: ${RECORD_ID} / ${FQDN}"
+        declare $RESULT_VAR=$( ${cf_dns_records}/${RECORD_ID} -X PUT ${type_json_arg} ${PAYLOAD} | jq .success )
+    fi
+
+    echo "set_record ${TYPE} / ${FQDN} <- ${ADDR}: ${!RESULT_VAR}"
+}
+
+[ ! -z $IP4 ] && set_dns A $IP4 IP4_RESULT
+[ ! -z $IP6 ] && set_dns AAAA $IP6 IP6_RESULT
+
+# issue acme.sh certs
+printf "\n"
+
+mkdir -p ~/tls/
+CERT_PATH=~/tls/${FQDN}-cert.pem
+KEY_PATH=~/tls/${FQDN}-key.pem
+
+if [ -f $CERT_PATH -a -f $KEY_PATH ]; then
+    echo "acme.sh: key cert pair found, renew"
+    printf "\n"
+    ~/.acme.sh/acme.sh --renew --ecc -d ${FQDN}
+else
+    echo "acme.sh: issue cert"
+    printf "\n"
+    while true ; do
+        ~/.acme.sh/acme.sh --issue -d ${FQDN} -w /var/acme-http/ -k ec-256 --key-file ${KEY_PATH} --fullchain-file ${CERT_PATH} --reloadcmd "systemctl reload nginx"
+        ACME_RET=$?
+        if [ $ACME_RET -eq 0 ] ; then
+            break
+        else
+            echo "acme.sh: wait for DNS propagation, retry after 60s"
+            for sec in {1..60} ; do
+                printf "."
+                sleep 1
+            done
+            printf "\n"
+        fi
+    done
+fi
+
+# config nginx
+PUBLISH_DIR=/publish
+CONF_HTTPS=/etc/nginx/conf.d/${FQDN}.conf
+mkdir -p ${PUBLISH_DIR}
+
+cat > ${CONF_HTTPS} <<-_EOF_
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    server_name ${FQDN};
+
+    ssl_certificate /root/tls/${FQDN}-cert.pem;
+    ssl_certificate_key /root/tls/${FQDN}-key.pem;
+
+    include /etc/nginx/tls-modern.incl;
+
+    location / {
+        root ${PUBLISH_DIR};
+        index index.html;
+        autoindex on;
+    }
+}
+_EOF_
+
+# check nginx is configured correctly
+nginx -t > /dev/null 2>&1
+NGINX_CONF_OK=$?
+if [ $NGINX_CONF_OK -eq 0 ] ; then
+    systemctl reload nginx
+else
+    printf "\n"
+    echo "nginx: config is incorrect"
+    echo "please inspect ${CONF_HTTPS}"
+fi
+NGINX_CONF_OK=$( [ $NGINX_CONF_OK -eq 0 ] && echo 'ok' || echo 'error' )
+
+# print summary
+printf "\n"
+echo "ip4: ${IP4}, ${IP4_RESULT}"
+echo "ip6: ${IP6}, ${IP6_RESULT}"
+echo "nginx: ${NGINX_CONF_OK}"

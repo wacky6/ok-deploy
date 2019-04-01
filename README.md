@@ -1,8 +1,6 @@
 # ok-deploy
 Composable One-Key Deploy Scripts for Ubuntu Server
 
-**\<Work in Progress\>**
-
 ## What's included
 Ubuntu server deploy scripts that suits wacky's tastes
 
@@ -12,22 +10,23 @@ Ubuntu server deploy scripts that suits wacky's tastes
 * unattended-upgrades for all packages
 * [Monitors]: iftop, iotop, glances
 * [Network]: traceroute, mtr
+* [Utils]: jq, iproute2, sed
 
 #### ssh
 * only allows pubkey auth
 * prompts for authorized_keys
 
-#### hostname
-* sets hostname
-
-#### acme.sh
-* acme.sh
-* issues host ecc/rsa cert (if hostname is configured)
+#### https
+* compose with `./nginx`
+* installs acme.sh, issues host ecc cert
+* configs nginx public https static hosting at `/publish`
+* sets CloudFlare dns record (export `CF_Email` and `CF_Key` first)
+* TODO: fetch CF_Email / CF_Key from remote (with .htpasswd)
 
 #### nginx
+* compose with `./https`
 * mainline nginx from official nginx repo
 * https redirection + ACME responder at `/var/acme-http`
-* compose with [acme.sh](https://github.com/Neilpang/acme.sh)
 * {tls-modern, proxy-headers} .incl for composable site configs
 * <Caution>: will set HSTS includeSubdomains preload, USE AT YOUR OWN RISK
 
