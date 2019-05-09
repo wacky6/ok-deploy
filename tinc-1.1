@@ -21,7 +21,7 @@ $INSTALL build-essential git curl \
 curl https://tinc-vpn.org/packages/$FILE | tar xz -C /tmp
 
 ( cd /tmp/$DIR ; \
-  CFLAGS='-march=native' ./configure $PREFIXES --with-systemd=$SYSTEMD_UNIT_PATH \
+  ./configure $PREFIXES --with-systemd=$SYSTEMD_UNIT_PATH \
   && make $MAKEOPTS \
   && make install \
   && $REMOVE texinfo \
