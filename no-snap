@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PURGE="apt purge"
+PURGE="apt purge -y"
 
 systemctl stop snapd
 $PURGE snapd lxd lxd-client
