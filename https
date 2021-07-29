@@ -107,7 +107,15 @@ else
     echo "acme.sh: issue cert"
     printf "\n"
     while true ; do
-        ~/.acme.sh/acme.sh --issue -d ${FQDN} -w /var/acme-http/ -k ec-256 --key-file ${KEY_PATH} --fullchain-file ${CERT_PATH} --reloadcmd "systemctl reload nginx"
+        ~/.acme.sh/acme.sh \
+            --server letsencrypt \
+            --issue -d ${FQDN} \
+            -w /var/acme-http/ \
+            -k ec-256 \
+            --key-file ${KEY_PATH} \
+            --fullchain-file ${CERT_PATH} \
+            --reloadcmd "systemctl reload nginx"
+
         ACME_RET=$?
         if [ $ACME_RET -eq 0 ] ; then
             break
