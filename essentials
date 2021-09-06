@@ -5,6 +5,8 @@ INSTALL='apt install -y'
 UPGRADE='apt upgrade -y'
 AUTOCLEAN='apt autoremove -y'
 
+export DEBIAN_FRONTEND=noninteractive
+
 $UPDATE
 $INSTALL \
     build-essential \
