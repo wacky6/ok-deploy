@@ -110,7 +110,7 @@ else
         ~/.acme.sh/acme.sh \
             --server letsencrypt \
             --issue -d ${FQDN} \
-            -w /var/acme-http/ \
+            --dns dns_cf \
             -k ec-256 \
             --key-file ${KEY_PATH} \
             --fullchain-file ${CERT_PATH} \
