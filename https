@@ -42,6 +42,9 @@ which nginx > /dev/null && echo 'found: nginx' || ./nginx
 which ${ACME_SH} > /dev/null && echo 'found: acme.sh' || ( curl -sL https://get.acme.sh | sh )
 printf "\n"
 
+printf "Change acme.sh CA to letsentrypt"
+$ACME_SH --set-default-ca --server letsencrypt
+
 ### guess IPv4 IPv6 address
 IP4=$( ip -4 addr show scope global | grep -o '\(inet \)[^/]\+' -m 1 | cut -c 6- )
 IP6=$( ip -6 addr show scope global | grep -o '\(inet6 \)[^/]\+' -m 1 | cut -c 7- )
@@ -102,13 +105,12 @@ KEY_PATH=~/tls/${FQDN}-key.pem
 if [ -f $CERT_PATH -a -f $KEY_PATH ]; then
     echo "acme.sh: key cert pair found, renew"
     printf "\n"
-    ~/.acme.sh/acme.sh --renew --ecc -d ${FQDN}
+    $ACME_SH --renew --ecc -d ${FQDN}
 else
     echo "acme.sh: issue cert"
     printf "\n"
     while true ; do
-        ~/.acme.sh/acme.sh \
-            --server letsencrypt \
+        $ACME_SH \
             --issue -d ${FQDN} \
             --dns dns_cf \
             -k ec-256 \
@@ -166,6 +168,9 @@ else
     echo "please inspect ${CONF_HTTPS}"
 fi
 NGINX_CONF_OK=$( [ $NGINX_CONF_OK -eq 0 ] && echo 'ok' || echo 'error' )
+
+# write configured fqdn to acme.sh directory for futher reference
+echo "$FQDN" > $( dirname $ACME_SH )/.ok-deploy-fqdn
 
 # print summary
 printf "\n"
