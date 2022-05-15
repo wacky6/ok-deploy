@@ -4,7 +4,6 @@ UPDATE="apt update -y"
 INSTALL="apt install -y"
 INSTALL_MIN="${INSTALL} --no-install-recommends"
 CLEANUP="apt autoremove -y"
-ADDKEY="apt-key add -"
 REPO_SOURCE=/etc/apt/sources.list
 
 # distro (auto-detect)
@@ -15,7 +14,8 @@ CODENAME=`lsb_release -cs | awk '{ print tolower($0) }'`
 ACME_HTTP_ROOT=/var/acme-http/
 
 # install nginx from official repo
-curl http://nginx.org/keys/nginx_signing.key | ${ADDKEY}
+mkdir /etc/apt/trusted.gpg.d
+curl -L http://nginx.org/keys/nginx_signing.key | tee /etc/apt/trusted.gpg.d/nginx.asc
 echo "deb http://nginx.org/packages/mainline/${DISTRO}/ ${CODENAME} nginx" >> ${REPO_SOURCE}
 echo "deb-src http://nginx.org/packages/mainline/${DISTRO}/ ${CODENAME} nginx" >> ${REPO_SOURCE}
 ${UPDATE}
