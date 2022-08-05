@@ -13,11 +13,14 @@ CODENAME=`lsb_release -cs | awk '{ print tolower($0) }'`
 # ACME HTTP root, compose with acme.sh
 ACME_HTTP_ROOT=/var/acme-http/
 
-# install nginx from official repo
-mkdir /etc/apt/trusted.gpg.d
-curl -L http://nginx.org/keys/nginx_signing.key | tee /etc/apt/trusted.gpg.d/nginx.asc
-echo "deb http://nginx.org/packages/mainline/${DISTRO}/ ${CODENAME} nginx" >> ${REPO_SOURCE}
-echo "deb-src http://nginx.org/packages/mainline/${DISTRO}/ ${CODENAME} nginx" >> ${REPO_SOURCE}
+# install nginx signing keys and configures repo
+curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+    | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+echo "deb [arch=$( dpkg-architecture -qDEB_BUILD_ARCH ) signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+http://nginx.org/packages/mainline/ubuntu $( lsb_release -cs ) nginx" \
+    | sudo tee /etc/apt/sources.list.d/nginx.list
+    
+# install from official repo
 ${UPDATE}
 ${INSTALL} nginx
 
