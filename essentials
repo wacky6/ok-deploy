@@ -12,8 +12,8 @@ $INSTALL \
     build-essential \
     vim \
     curl wget aria2 \
-    iftop iotop htop nethogs iperf3 \
-    traceroute mtr \
+    iftop iotop htop nethogs iperf3 net-tools \
+    traceroute mtr-tiny \
     jq sed iproute2
 $UPGRADE
 update-alternatives --set editor $( realpath $( which vim ) )
