@@ -13,4 +13,4 @@ dpkg -i cuda-keyring_1.0-1_all.deb
 rm -f cuda-keyring_1.0-1_all.deb
 
 $UPDATE
-$INSTALL cuda
+$INSTALL cuda libcudnn8 libcudnn8-dev
