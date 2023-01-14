@@ -8,13 +8,17 @@ ACME_SH=~/.acme.sh/acme.sh
 
 CF_Endpoint=https://api.cloudflare.com/client/v4/
 
-if [ -z "${CF_Email}" -o -z "${CF_Key}" ] ; then
-    echo "CF_Email and CF_Key are not set"
-    echo "run the following script:"
+if [ -z "${CF_Email}" -o -z "${CF_Key}" ] && [ -z "${CF_Account_ID}" -o -z "${CF_Token}" ]; then
+    echo "Cloudflare credential isn't set"
+    echo "Fill in and run either of the followings:"
     echo ""
+    echo "  # Global API key"
     echo "  export CF_Email="
     echo "  export CF_Key="
     echo ""
+    echo "  # Access Token, requires: Zone.Zone (read), Zone.DNS (read, write)"
+    echo "  export CF_Account_ID="
+    echo "  export CF_Token="
     exit 2
 fi
 
@@ -22,17 +26,17 @@ fi
 DOMAIN='wacky.one'
 FQDN=$( hostname )
 
-while [[ $FQDN != *.${DOMAIN} ]] ; do
-    printf "\n"
+while [[ ${FQDN} != *.${DOMAIN} ]] ; do
+    echo ""
     echo "<!> fqdn is ${FQDN}, does not match ${DOMAIN}"
     echo "<!> please specify:"
-    printf "\n"
+    echo ""
     read -p "fqdn > " FQDN
-    printf "\n"
+    echo ""
 done
 
 echo "fqdn: ${FQDN}"
-printf "\n"
+echo ""
 
 # check and install prerequisites
 which curl > /dev/null && echo 'found: curl' || ./essentials
@@ -40,9 +44,9 @@ which jq > /dev/null && echo 'found: jq' || ./essentials
 which ip > /dev/null && echo 'found: iproute2' || ./essentials
 which nginx > /dev/null && echo 'found: nginx' || ./nginx
 which ${ACME_SH} > /dev/null && echo 'found: acme.sh' || ( curl -sL https://get.acme.sh | sh )
-printf "\n"
+echo ""
 
-printf "Change acme.sh CA to letsentrypt"
+echo "Change acme.sh CA to letsentrypt"
 $ACME_SH --set-default-ca --server letsencrypt
 
 ### guess IPv4 IPv6 address
@@ -51,15 +55,30 @@ IP6=$( ip -6 addr show scope global | grep -o '\(inet6 \)[^/]\+' -m 1 | cut -c 7
 
 [ -z $IP4 ] && echo "ipv4: not found" || echo "ipv4: ${IP4}"
 [ -z $IP6 ] && echo "ipv6: not found" || echo "ipv6: ${IP6}"
-printf "\n"
+echo ""
 
-cf_api="curl -s -H X-Auth-Email:${CF_Email} -H X-Auth-Key:${CF_Key} ${CF_Endpoint}"
+# $1: path (e.g. zones/<id>/dns_records)
+# $@: args appended to `curl`
+function cf_api () {
+    local path="$1"
+    shift 1
+
+    if [ -n "${CF_Email}" -a -n "${CF_Key}" ] ; then
+        curl -s -H "X-Auth-Email: ${CF_Email}" -H "X-Auth-Key: ${CF_Key}" "${CF_Endpoint}${path}" "$@"
+    elif [ -n "${CF_Account_ID}" -a -n "${CF_Token}" ] ; then
+        curl -s -H "Authorization: Bearer ${CF_Token}" "${CF_Endpoint}${path}" "$@"
+    else
+        echo "assertion: not reached."
+	echo "either CF_Email + CF_Key or CF_Account_ID + CF_Token needs to be provided"
+        exit 2
+    fi
+}
 
 # probe zone id
-ZONE_ID=$( ${cf_api}zones\?name=${DOMAIN} | jq '.result[0].id' )
+ZONE_ID=$( cf_api zones\?name=${DOMAIN} | jq '.result[0].id' )
 
-if [ ${ZONE_ID} == null ] ; then
-    echo "zone_id: null"
+if [ "${ZONE_ID:-null}" == null ] ; then
+    echo "failed to retrieve zone id."
     exit 2
 else
     ZONE_ID=$( echo $ZONE_ID | cut -d \" -f 2 )
@@ -68,35 +87,36 @@ fi
 
 # create or update ipv4 / ipv6 record
 function set_dns () {
-    printf "\n"
+    echo ""
 
     TYPE=$1
     ADDR=$2
     RESULT_VAR=$3
-    RECORD_ID=$( ${cf_api}zones/${ZONE_ID}/dns_records\?type=${TYPE}\&name=${FQDN} | jq .result[0].id )
+    RECORD_ID=$( cf_api zones/${ZONE_ID}/dns_records\?type=${TYPE}\&name=${FQDN} | jq .result[0].id )
 
-    cf_dns_records="${cf_api}zones/${ZONE_ID}/dns_records"
-    type_json_arg="-H Content-Type:application/json --data-ascii"
 
     PAYLOAD={\"type\":\"${TYPE}\",\"name\":\"${FQDN}\",\"content\":\"${ADDR}\"}
 
     if [ null == $RECORD_ID ] ; then
-        echo "record_id: null"
-        declare $RESULT_VAR=$( ${cf_dns_records} -X POST ${type_json_arg} ${PAYLOAD} | jq .success )
+        echo "record doesn't exist, creating a new one."
+        declare $RESULT_VAR=$( cf_api zones/${ZONE_ID}/dns_records -X POST -H "Content-Type: application/json" --data-ascii ${PAYLOAD} | jq .success )
     else
         RECORD_ID=$( echo $RECORD_ID | cut -d \" -f 2 )
-        echo "record_id: ${RECORD_ID} / ${FQDN}"
-        declare $RESULT_VAR=$( ${cf_dns_records}/${RECORD_ID} -X PUT ${type_json_arg} ${PAYLOAD} | jq .success )
+        echo "record found, record_id = ${RECORD_ID} -> ${FQDN}"
+        declare $RESULT_VAR=$( cf_api zones/${ZONE_ID}/dns_records/${RECORD_ID} -X PUT -H "Content-Type: application/json" --data-ascii ${PAYLOAD} | jq .success )
     fi
 
-    echo "set_record ${TYPE} / ${FQDN} <- ${ADDR}: ${!RESULT_VAR}"
+    echo "set_dns: ${TYPE} / ${FQDN} <- ${ADDR}: ${!RESULT_VAR}"
 }
 
 [ ! -z $IP4 ] && set_dns A $IP4 IP4_RESULT
 [ ! -z $IP6 ] && set_dns AAAA $IP6 IP6_RESULT
 
 # issue acme.sh certs
-printf "\n"
+echo ""
+
+# pass probed ZONE_ID to acme.sh
+export CF_Zone_ID="${ZONE_ID}"
 
 mkdir -p ~/tls/
 CERT_PATH=~/tls/${FQDN}-cert.pem
@@ -104,11 +124,11 @@ KEY_PATH=~/tls/${FQDN}-key.pem
 
 if [ -f $CERT_PATH -a -f $KEY_PATH ]; then
     echo "acme.sh: key cert pair found, renew"
-    printf "\n"
+    echo ""
     $ACME_SH --renew --ecc -d ${FQDN}
 else
     echo "acme.sh: issue cert"
-    printf "\n"
+    echo ""
     while true ; do
         $ACME_SH \
             --issue -d ${FQDN} \
@@ -116,7 +136,8 @@ else
             -k ec-256 \
             --key-file ${KEY_PATH} \
             --fullchain-file ${CERT_PATH} \
-            --reloadcmd "systemctl reload nginx"
+            --reloadcmd "systemctl reload nginx" \
+	    --force
 
         ACME_RET=$?
         if [ $ACME_RET -eq 0 ] ; then
@@ -124,10 +145,10 @@ else
         else
             echo "acme.sh: wait for DNS propagation, retry after 60s"
             for sec in {1..60} ; do
-                printf "."
+                echo "."
                 sleep 1
             done
-            printf "\n"
+            echo ""
         fi
     done
 fi
@@ -163,7 +184,7 @@ NGINX_CONF_OK=$?
 if [ $NGINX_CONF_OK -eq 0 ] ; then
     systemctl reload nginx
 else
-    printf "\n"
+    echo ""
     echo "nginx: config is incorrect"
     echo "please inspect ${CONF_HTTPS}"
 fi
@@ -173,7 +194,7 @@ NGINX_CONF_OK=$( [ $NGINX_CONF_OK -eq 0 ] && echo 'ok' || echo 'error' )
 echo "$FQDN" > $( dirname $ACME_SH )/.ok-deploy-fqdn
 
 # print summary
-printf "\n"
+echo ""
 echo "ip4: ${IP4}, ${IP4_RESULT}"
 echo "ip6: ${IP6}, ${IP6_RESULT}"
 echo "nginx: ${NGINX_CONF_OK}"
