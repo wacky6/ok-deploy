@@ -1,0 +1,64 @@
+#cloud-config
+apt:
+  primary:
+    - arches: [amd64]
+      search:
+        - https://mirrors.syd.wacky.one/ubuntu
+        - https://au.archive.ubuntu.com/ubuntu
+  # TODO: Add nginx / cuda here
+network:
+  version: 2
+  ethernets:
+    eth0:
+      renderer: NetworkManager
+      match:
+        name: "en*"
+      dhcp4: true
+      dhcp6: false
+
+growpart:
+  mode: auto
+  devices: ['/']
+  ignore_growroot_disabled: false
+ssh_pwauth: false
+users:
+  - name: root
+    lock_passwd: false
+    # passwd: root
+    # doesn't matter here, passwd login is disabled outside of serial
+    hashed_passwd: $1$v11Nxm$Gjqipy.7Rkj10sxu5Zt0N.
+    ssh_authorized_keys:
+      # Hand-carry and workstation
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCssVekoSNPKvatYIY9kfqN/baA+UugKHc4bO32Losa4rrTQZ44R9Ihv1/fXOyEaveGYdawDS5oyPXGtAV3pljFELXs65cSUD+WXQOEtR2ZKT2omItBryNGJHjSyxu0dWCoe984R0jn4PJLLoTfUcdHI/8SzKrjyKlcdRvVFmbEREAIer+As6fY+fRyPST3ExYmnLBi+YMNFkH/DZ5wHpxPFT9X8GV5pEMg1k3LgSip0vuYOSY5uCuXG8BEkpq8GMt9uM1p52IopyTrjqbMowum6J/kTfhPH7WowNFWJ4xS64Hig6pQQB4Hyyp6DmRPqEyYai64ZB/dmPYUtNCK/PAh16Fh1PNa0uMLsWcgnKZYlYovakwchDcgGfCgpydpQ3XnOpSR3Oaxryc6QRq3/grJCLr4ba+0tworqJGds7k1UE9mGbEJkSXVhRw1W3/wIjfjTcJu64SAtWtHQC/thPemn1truiwBKDW3w3mJKbJnt7ze1ke7roLZstGsrFDKKpjpGBVKaRMeoQFh41AlNKYsC3C4Zip7NPpuCe8jx7nqkyk1Y24h7OKf1Nb0jhom0knfo0Esv9DvdTJTte6ypc8Cx8Z+NFgP2Ij+v3/iPUrceZKK6ZD5ycgZUQSIYIdexzfxfLmlOl+5+LZurrZQe0WTBZtf7BAuHz+l4/Vzq8D/aw== Aries.MBP2015early
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDWjip9FlpIqGmNUGoq+y+94++fpHSsacKh/KYlZ14kMQJd061s1XhG9qL2CaRDPVzThWC4ZQs/rGOv2Im3VyNfG8im82WKJqdl0hmL5ZrDhrQjfVDpUB7szN2qHWR1CYyLwpyPDWQHwE1GigJbF+A70SDrwhDrDFlq+P8ZEkMvoJoEtgY468Bk0uujaMhM++gGg4tkecX6JAqx2+BY90FSzbAZk1XOHmz58dbH2k2HOYmbTEqUGpmlORLQVUOhGO06J6gVOqh/rKyhItN1Ausd2A30wY2oifJt2jMCcjNWUkbL7NvLFwefvB8EiR5OEtHa3+NkqwBjJ2rPKElpDAlv WaCkY-ip11p
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC+8lhsNlsjYJN/y2EICufnI+05wcAIEz7J2Ns8I/LKxfKqt1bCedQzzdWSQAx4tPMQhodrDVwob0jgbneh6pbXb44hEdoUKrSSFeAJZgorAZra6SvmIgsLsswkBJQEVsC+jBi09tdV/MfpLooK1x6cn2daXeb7MgA9WlPq8L/naoj2KRiL40Y1RI58A77DU1Q43j6zBHx4cr1kLHDcuWPf9mZUMSgbUl678Je/4jq8XaCNkuZLM8J5RZ68D1M6hcdvTX1ThY85N5ZdlWVQTgUuMpB2PxpDzcsm2NnqKMr9VaSHh/AgE8iEkpycMyGs7gfcHjPYuvFKZh93i6bTlJHzsdpVE1jcIFEG1kOXiTZERFVV0xY/RIAlVumKmQ0e/mflwRXVdQ8Wpz/xlyWmRFd5ev1Od7sFgu6ZPhqnFUynR5JfbYdqBl9xIOXk/q8UYLAKVfUz539kSZx/z1raSyyRffyDgvGMWNERX2CFSY7es9LogmCxq8fSXKUrLB9pyV8= kohaku
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD0xJStIXC9PoNp73/P+0tfSNlxNzbTjMORNZcLCnnp8+D5q/maDh1qwsOyLGwrNtGMSTkLr47LrDc+5mEzEB1ob57wEWJuSw/89UjHPzKwidAbXB2+7fhx2keOV4amwFs5vEm3DZSW2A0TXh80qbBUOM0O+FeihzWyZQI5mrtDOqoz1MEvBPvaX40RnDJx4ziycT6CerSzROwdG4/sqYf2tTGEysd8lo5VyLki3jDsqE+EWbBsHO/HpQ5U/vVRJ26I+dehNBqJSR8jFs4Gf2LF2+E3oQ/zvQQGhECStHDCCJ45iRhl6ZnIuxvMEO5/izm67YDuU6LV27yUDKd/Muw3YYHgxSgII9aIoHH7BZZipEQfrjEfuD+wCi1OnaNxGPCKwCYjHoXzSOTIf85csqqcEDqgEmoBhAI7NWKFzOretdk58PDsLstls07vqKope/Q4t9RwVBNFFEOXYVuGbTI31tlAgYlgnWAnzutoq0ayve0QpZGlelDJWtiT0qCF/I8= root@magus2.syd
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1TyePE510xgIR61MBLD824dVSRSZQqF1//QEjzX82BVCMAcPzWY3Djy8BTd9YBcrGoVrXuszRKNDrLYnsdKsFXEHokN+ixO7uKsjn8bDfPM4jOri2TmL6LDCzLMGQa5T0HEzvaDbeFHWQ+NALsMzCZUnOw9dZ9IGe83wXi+yrfCbIARWtHuI4FBs56qizdtCFmIay/heyYxF+W/gB6PU50+S0loa87UQtZx3tUUKGS9LU6qizFKizvpIOx2swBc45zk2IFvfN/cCZpFyWifeFD25NS8UsB5LfnVwmDXnLuaQNKYnnVjbDg14IYJCr8K3a9JVcQzOxvBNA1i9HmyXuj43HGPTxgeyvCQIUWWh5Q3Y0Ak5kMCCzhM+mSwsWLsYkzhk7dGJwWtgsgg9INZAjqNN3SxJ5j/1rxPc0ObRtXQsfEXqu65hiU0Fy6Aq8ftdILdLW2Ou5Z2RfnVF6iRwZNDNyodExd/B5RjSsaXpfMklgFNRT3IuiRABWh/o/1rE= wacky@alchemist.syd
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIkYMSGU+kU1we+yX39MLtVg8QGs+cG/+7UJ/RV7luk1TECFNvoDdq1BPQwInpPwMKScUaHkH/VI7Xw5yER1Cq6v4iOO3TNaFySY7AzNzU9Hts4fBZeh8NfRzBDMvWvAOxD7Ij+K37SmXyMnAKWfVb4u01OBWubL3ICFF3DaFOQZ89RkRz2bKqahM4e+4yriM8h7q88msctzLqWy3gXNMYhmtqp26FApz1aPYZvsdAkRpr5Dq9gY9YkaUdIjq77tXAWxpSauZmVGBW9Ipz8VDJirzHnpwY7gnHlitRVHMkG4yBNeU6v6RvMa2NJBtZsCpvuFqjbLowZT8uS4+I03Vp root@nkg2
+package_update: true
+package_upgrade: true
+packages:
+  - network-manager
+  - build-essential
+  - screen
+  - git
+  - vim
+  - curl
+  - wget
+  - aria2
+  - iftop
+  - iotop
+  - htop
+  - nethogs
+  - iperf3
+  - net-tools
+  - traceroute
+  - mtr-tiny
+  - jq
+  - sed
+  - iproute2
+runcmd:
+  - "git clone https://github.com/wacky6/ok-deploy --depth 1 /root/ok-deploy"
+  - "/root/ok-deploy/essentials"
+  - "/root/ok-deploy/bbr"
+  - "/root/ok-deploy/zsh"
