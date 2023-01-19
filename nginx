@@ -19,7 +19,7 @@ curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
 echo "deb [arch=$( dpkg-architecture -qDEB_BUILD_ARCH ) signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
 http://nginx.org/packages/mainline/ubuntu $( lsb_release -cs ) nginx" \
     | sudo tee /etc/apt/sources.list.d/nginx.list
-    
+
 # install from official repo
 ${UPDATE}
 ${INSTALL} nginx
@@ -84,6 +84,15 @@ server {
         # index index.html;
         include /etc/nginx/proxy-headers.incl;
         return 204;
+    }
+
+    location /upstream/ {
+        proxy_pass http://127.0.0.1:10000/;
+
+        # Uncomment to forward WebSocket
+        #proxy_set_header Upgrade $http_upgrade;
+        #proxy_set_header Connection "Upgrade";
+        #proxy_set_header Host $host;
     }
 }
 _EOF_
