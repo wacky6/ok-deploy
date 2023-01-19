@@ -1,0 +1,160 @@
+#!/bin/bash
+
+# Color text vars
+# This script needs to support bash, so we can't use ZSH style escape :(
+# Pull color escape codes from: https://stackoverflow.com/a/28938235
+C_f='\033[0m'
+C_F_Yellow='\033[0;33m'
+C_F_Red='\033[0;31m'
+
+# set important environment variables if they haven't been set
+# POSIX: https://pubs.opengroup.org/onlinepubs/009695299/utilities/id.html
+USER=${USER:-$(id -u -n)}
+# POSIX: https://pubs.opengroup.org/onlinepubs/009696899/basedefs/xbd_chap08.html#tag_08_03
+HOME="${HOME:-$(getent passwd $USER 2>/dev/null | cut -d: -f6)}"
+
+if [ $USER -eq "root" ] ; then
+  UPDATE="apt update -y"
+  INSTALL="apt install -y"
+  INSTALL_MIN="${INSTALL} --no-install-recommends"
+  CLEANUP="apt autoremove -y"
+else
+  # Non-root (corp).
+  UPDATE="sudo apt update -y"
+  INSTALL="sudo apt install -y"
+  INSTALL_MIN="sudo ${INSTALL} --no-install-recommends"
+  CLEANUP="sudo apt autoremove -y"
+fi
+
+# Check required tools.
+if ! type "jq" > /dev/null || ! type "curl" > /dev/null || ! type "grep" > /dev/null || ! type "tr" > /dev/null || ! type "sed" > /dev/null; then
+  echo -e "${C_F_Yellow}Install required tools.${C_f}"
+  ${UPDATE}
+  ${INSTALL_MIN} curl jq grep coreutils sed
+fi
+
+# Helper to complain possible out-of-date scenario.
+# $1: a message to log.
+function complain () {
+  echo -e "${C_F_Red}$1${C_f}"
+  echo "This script probably needs update :("
+  echo "  -> https://github.com/wacky6/ok-deploy/issues/new"
+  exit 1
+}
+
+echo -e "${C_F_Yellow}Fetching code-server release list.${C_f}"
+release_urls=$( curl -L https://api.github.com/repos/coder/code-server/releases/latest | jq '.assets[].browser_download_url' | tr -d '"' )
+
+# Assume URL is meaningful to human, grep release version.
+ver=$( echo $release_urls | grep -o '/v[^/]\+/' | grep -o '[^/]\+' | uniq )
+ver_count=$( echo $ver | tr -d -c "[:space:]" | wc -c)
+if [ "$ver_count" -gt "1" ] ; then
+  complain "Found multiple versions: $ver"
+fi
+if [ "$ver_count" -lt "1" ] ; then
+  complain "Found no release URL"
+fi
+
+echo -e "${C_F_Yellow}Found version: $ver${C_f}"
+
+# Assume os=linux, arch=amd64.
+# Could try probing.
+arch=amd64
+os=linux
+echo -e "${C_F_Yellow}Found OS/arch: $os $arch${C_f}"
+
+# Find download URL.
+pkg_url=""
+for u in $release_urls ; do
+  if [ $( echo $u | grep $arch | grep $os | grep $ver | wc -l ) -eq 1 ] ; then
+    pkg_url="$u"
+  fi
+done
+
+if [[ -z "$pkg_url" ]] ; then
+  for u in $release_urls ; do
+    echo $u
+  done
+  complain "Can't find a suitable release package (see above)."
+fi
+
+# Download and unpack.
+INSTALL_DIR="$HOME/code-server"
+ENTRYPOINT="$INSTALL_DIR/bin/code-server"
+echo -e "${C_F_Yellow}Install as ${USER} to ${INSTALL_DIR}${C_f}"
+mkdir -p $INSTALL_DIR
+curl -L $pkg_url | tar xz --strip-components=1 -C $INSTALL_DIR
+if [ ! -f "$ENTRYPOINT" ] ; then
+  complain "Can't find code-server entrypoint (perhaps download or extraction failed)."
+fi
+
+# Patch web app manifest to include server identity.
+# short_name grep is a hack xD
+manifest_handler=$( grep -rl 'short_name:' "$INSTALL_DIR" )
+for f in $manifest_handler ; do
+  echo -e "${C_F_Yellow}Patch manifest handler with host identifier: $f"
+  host_id=$( hostname -f )
+  sed -i "s;\"code-server\";\"Code ${host_id}\";g" "$f"
+done
+
+# Probe init system, configure autostart.
+if type "systemctl" > /dev/null ; then
+  # systemd
+  echo -e "${C_F_Yellow}Found systemd, config auto start.${C_f}"
+
+  if [[ ${USER} -eq "root" ]] ; then
+    systemctl_cmd="systemctl"
+    unit_name="code-server"
+    unit_file="/etc/systemd/system/${unit_name}.service"
+  else
+    systemctl_cmd="systemctl --user"
+    unit_name="code-server"
+    unit_file="${HOME}/.config/systemd/user/${unit_name}.service"
+  fi
+
+  mkdir -p $( dirname $unit_file )
+  cat > $unit_file <<-_EOF_
+[Unit]
+Description=Code Server for ${USER}
+
+[Service]
+# %h points to home directory
+Environment=CODE_DIR=%h
+
+# SSH forward (or reverse proxy) to this port
+# Default: 0x0cd0 -> 3280
+Environment=PORT=3280
+
+# Bump node memory limit
+Environment=NODE_OPTIONS=--max-old-space-size=16384
+
+# Uncomment to set display for Chrome Remote Desktop (including cloudtop).
+# Environment=DISPLAY=:20
+
+# \`--auth=none\` so you don't type password every time
+# \`--bind-addr=localhost:...\` so others can't mess with your IDE
+# \`--user-data-dir=%h/.%N\` creates a per-project configuration (based on unit file name)
+ExecStart=%h/code-server/bin/code-server \\
+    --auth none \\
+    --bind-addr localhost:\${PORT} \\
+    --user-data-dir %h/.%N \\
+    \${CODE_DIR}
+
+Restart=always
+Type=simple
+LimitNOFILE=infinity
+
+[Install]
+WantedBy=basic.target
+_EOF_
+
+  echo -e "${C_F_Yellow}Unit file written to: ${unit_file}${C_f}"
+  echo -e "${C_F_Yellow}Starting service: ${unit_name}${C_f}"
+
+  $systemctl_cmd daemon-reload
+  $systemctl_cmd enable ${unit_name}
+  $systemctl_cmd start ${unit_name}
+  $systemctl_cmd status --no-pager --lines=0 ${unit_name}
+  
+  echo -e "${C_F_Yellow}Done.${C_f}"
+fi
