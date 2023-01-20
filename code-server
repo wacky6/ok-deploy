@@ -13,7 +13,7 @@ USER=${USER:-$(id -u -n)}
 # POSIX: https://pubs.opengroup.org/onlinepubs/009696899/basedefs/xbd_chap08.html#tag_08_03
 HOME="${HOME:-$(getent passwd $USER 2>/dev/null | cut -d: -f6)}"
 
-if [ $USER -eq "root" ] ; then
+if [ $USER == "root" ] ; then
   UPDATE="apt update -y"
   INSTALL="apt install -y"
   INSTALL_MIN="${INSTALL} --no-install-recommends"
@@ -84,7 +84,7 @@ ENTRYPOINT="$INSTALL_DIR/bin/code-server"
 echo -e "${C_F_Yellow}Install as ${USER} to ${INSTALL_DIR}${C_f}"
 mkdir -p $INSTALL_DIR
 curl -L $pkg_url | tar xz --strip-components=1 -C $INSTALL_DIR
-if [ ! -f "$ENTRYPOINT" ] ; then
+if [[ ! -f "$ENTRYPOINT" ]] ; then
   complain "Can't find code-server entrypoint (perhaps download or extraction failed)."
 fi
 
@@ -100,9 +100,9 @@ done
 # Probe init system, configure autostart.
 if type "systemctl" > /dev/null ; then
   # systemd
-  echo -e "${C_F_Yellow}Found systemd, config auto start.${C_f}"
+  echo -e "${C_F_Yellow}Found systemd.${C_f}"
 
-  if [[ ${USER} -eq "root" ]] ; then
+  if [[ ${USER} == "root" ]] ; then
     systemctl_cmd="systemctl"
     unit_name="code-server"
     unit_file="/etc/systemd/system/${unit_name}.service"
@@ -112,8 +112,18 @@ if type "systemctl" > /dev/null ; then
     unit_file="${HOME}/.config/systemd/user/${unit_name}.service"
   fi
 
-  mkdir -p $( dirname $unit_file )
-  cat > $unit_file <<-_EOF_
+  # Search for existing code-server like configs, don't overwrite.
+  if [[ $( ls $( dirname "$unit_file" )/code-*.service | wc -l ) -gt 0 ]] ; then
+    echo -e "${C_F_Yellow}Found existing systemd unit files, skip unit file creation."
+    for service in $( ls $( dirname "$unit_file" )/code-*.service ) ; do
+      service_name=$( basename "$service" )
+      echo -e "${C_F_Yellow}Restarting $service_name."
+      $systemctl_cmd restart $service_name
+      $systemctl_cmd status --no-pager --lines=0 ${service_name}
+    done
+  else
+    mkdir -p $( dirname $unit_file )
+    cat > $unit_file <<-_EOF_
 [Unit]
 Description=Code Server for ${USER}
 
@@ -148,13 +158,14 @@ LimitNOFILE=infinity
 WantedBy=basic.target
 _EOF_
 
-  echo -e "${C_F_Yellow}Unit file written to: ${unit_file}${C_f}"
-  echo -e "${C_F_Yellow}Starting service: ${unit_name}${C_f}"
+    echo -e "${C_F_Yellow}Unit file written to: ${unit_file}${C_f}"
+    echo -e "${C_F_Yellow}Starting service: ${unit_name}${C_f}"
 
-  $systemctl_cmd daemon-reload
-  $systemctl_cmd enable ${unit_name}
-  $systemctl_cmd start ${unit_name}
-  $systemctl_cmd status --no-pager --lines=0 ${unit_name}
+    $systemctl_cmd daemon-reload
+    $systemctl_cmd enable ${unit_name}
+    $systemctl_cmd start ${unit_name}
+    $systemctl_cmd status --no-pager --lines=0 ${unit_name}
+  fi
   
   echo -e "${C_F_Yellow}Done.${C_f}"
 fi
