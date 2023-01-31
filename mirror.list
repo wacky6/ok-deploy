@@ -1,0 +1,38 @@
+# apt-mirror config for repo mirror servers
+# Use https://github.com/Stifler6996/apt-mirror to support CNF (command not found) files.
+#
+# Mirror servers:
+#  - mirrors.syd.wacky.one (physically argo.syd.wacky.one)
+
+set base_path    /mirrors/deb-repo
+set nthreads     4
+set defaultarch  amd64
+set _tilde 0
+
+# Mirrored DEB repos
+# TODO: Find a way to map upstream repo to local URL (right now it's sed-friendly replacement command)
+
+# ----- Ubuntu 2204
+# Note, i386 is wanted for Ubuntu Desktop installations.
+
+# OS repo
+# sed s|http://au.archive.ubuntu.com/ubuntu|https://mirrors.syd.wacky.one/ubuntu|g
+deb http://au.archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+clean http://au.archive.ubuntu.com/ubuntu
+
+# NVIDIA CUDA
+# sed s|https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64|https://mirrors.syd.wacky.one/cuda|g
+deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64 /
+clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64
+
+# Nginx
+# sed s|http://nginx.org/packages/mainline/ubuntu|https://mirrors.syd.wacky.one/nginx|g
+deb [arch=amd64 signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/mainline/ubuntu jammy nginx
+clean http://nginx.org/packages/mainline/ubuntu
