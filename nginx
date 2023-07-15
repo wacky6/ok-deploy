@@ -69,8 +69,9 @@ _EOF_
 # example config
 cat > /etc/nginx/conf.d/example <<-_EOF_
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
 
     server_name \$SNI_NAME;
 
