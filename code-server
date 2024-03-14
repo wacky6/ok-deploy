@@ -153,6 +153,7 @@ ExecStart=%h/code-server/bin/code-server \\
 Restart=always
 Type=simple
 LimitNOFILE=infinity
+StartLimitInterval=0
 
 [Install]
 WantedBy=basic.target
