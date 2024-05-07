@@ -1,31 +1,38 @@
 #!/bin/bash
 
-FILE=tinc-1.1pre17.tar.gz
-DIR=`basename $FILE .tar.gz`
+set -euo pipefail
+
+VERSION_TAG=release-1.1pre18
+DIR="tinc-$VERSION_TAG"
 PREFIXES="--prefix=/usr --exec-prefix=/usr --sysconfdir=/etc --localstatedir=/var"
+GCC_FLAGS="-g -march=x86-64 -O3 -fPIE \
+  -Wall -Wconversion -fwrapv \
+  -fstack-protector-strong \
+  -DFORTIFY_SOURCE=2"
+IDENTITY_FILE="/root/.ssh/id_ed25519_tinc_config"
 
 CORES=`grep -c processor < /proc/cpuinfo`
 MAKE_OPTS=-j${CORES}
 INSTALL='apt install --no-install-recommends -y'
-REMOVE='apt remove -y'
-AUTOREMOVE='apt autoremove -y'
 
 SYSTEMD_UNIT_PATH=/usr/lib/systemd/system
 
-$INSTALL build-essential git curl \
-         zlib1g-dev libssl-dev \
-         readline-common libreadline-dev \
-         ncurses-base ncurses-bin libncurses-dev \
-         liblzo2-2 liblzo2-dev sed texinfo
+$INSTALL build-essential autoconf automake git curl sed ssh-tools \
+         readline-common libreadline-dev libncurses-dev \
+         zlib1g-dev liblzo2-dev
 
-curl https://tinc-vpn.org/packages/$FILE | tar xz -C /tmp
-
-( cd /tmp/$DIR ; \
-  ./configure $PREFIXES --with-systemd=$SYSTEMD_UNIT_PATH \
-  && make $MAKEOPTS \
-  && make install \
-  && $REMOVE texinfo \
-  && $AUTOREMOVE \
+( cd /tmp ;
+  rm -rf $DIR ;
+  git clone --depth 1 --branch $VERSION_TAG https://github.com/gsliepen/tinc.git $DIR
+  cd $DIR
+  autoreconf -fsi \
+  && CFLAGS="$GCC_FLAGS" CXXFLAGS="$GCC_FLAGS" \
+    ./configure $PREFIXES \
+    --with-systemd=$SYSTEMD_UNIT_PATH \
+    --disable-legacy-protocol \
+  && sed -i 's/^MAKEINFO = .*$/MAKEINFO = true/' ./doc/Makefile \
+  && make $MAKE_OPTS \
+  && make install
 )
 
 # patch systemd unit file to include PID and log file
@@ -36,20 +43,27 @@ else
     echo "systemd unit file already has pidfile"
 fi
 
-# check pubkey, it needs to be tinc-config's deployment key
-if [ ! -f /root/.ssh/id_rsa.pub ]; then
-    echo "pubkey does not exist, generating..."
-    ssh-keygen -f /root/.ssh/id_rsa -N ''
+# check tinc-config deployment key, generate one if necessary
+if [ ! -f ${IDENTITY_FILE}.pub ]; then
+    echo "pubkey doesn't exist, generating..."
+    ssh-keygen -t ed25519 -f ${IDENTITY_FILE} -N ''
     echo ""
 else
     echo "pubkey found."
 fi
 
+GIT_SSH_COMMAND="ssh -i $IDENTITY_FILE \
+  -o StrictHostKeyChecking=no \
+  -o IdentitiesOnly=yes \
+  -o UserKnownHostsFile=/dev/null"
+
+export GIT_WITH_CRED="GIT_SSH_COMMAND='$GIT_SSH_COMMAND' git"
+
 # generate config if necessary
-if [ ! -f /etc/tinc/overlay/tinc.conf ]; then
-    echo "###### Add the following to tinc-config deployment key (write access)"
+if [ ! -d /etc/tinc/overlay ]; then
+    echo "###### Add the following to tinc-config repo deployment key (with write access)"
     echo ""
-    cat /root/.ssh/id_rsa.pub
+    cat ${IDENTITY_FILE}.pub
     echo ""
     echo "###### Press enter when complete"
     read -p "  Waiting for Enter > "
@@ -58,7 +72,8 @@ if [ ! -f /etc/tinc/overlay/tinc.conf ]; then
     echo "Pulling tinc-config..."
     mkdir -p /etc/tinc
     ( cd /etc/tinc; \
-      git clone git@github.com:wacky6/tinc-config --branch overlay --depth 1 overlay;
+      eval $GIT_WITH_CRED clone git@github.com:wacky6/tinc-config \
+        --branch overlay --depth 1 overlay;
     )
 
     # start tinc-config's config script
@@ -77,11 +92,11 @@ if [ ! -f /etc/tinc/overlay/tinc.conf ]; then
     # push tinc to upstream
     echo "###### Pushing to upstream"
     ( cd /etc/tinc/overlay; \
-      git config user.email "$(hostname)-admin@wacky.one"; \
-      git config user.name "$(hostname)"; \
-      git add hosts/; \
-      git commit -m "add $( hostname )"; \
-      git push origin overlay;
+      eval $GIT_WITH_CRED config user.email "$(hostname)-admin@wacky.one"; \
+      eval $GIT_WITH_CRED config user.name "$(hostname)"; \
+      eval $GIT_WITH_CRED add hosts/; \
+      eval $GIT_WITH_CRED commit -m "add $( hostname )"; \
+      eval $GIT_WITH_CRED push origin overlay;
     )
 else
     echo "tinc-config exists, skipping."
@@ -105,4 +120,3 @@ systemctl start tinc
 echo "**** Complete ****"
 echo "path: $( which tincd )"
 tincd --version | head -n1
-
