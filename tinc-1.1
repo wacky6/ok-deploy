@@ -72,7 +72,7 @@ if [ ! -d /etc/tinc/overlay ]; then
     echo "Pulling tinc-config..."
     mkdir -p /etc/tinc
     ( cd /etc/tinc; \
-      eval $GIT_WITH_CRED clone git@github.com:wacky6/tinc-config \
+      $GIT_WITH_CRED clone git@github.com:wacky6/tinc-config \
         --branch overlay --depth 1 overlay;
     )
 
