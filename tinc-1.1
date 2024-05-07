@@ -72,7 +72,7 @@ if [ ! -d /etc/tinc/overlay ]; then
     echo "Pulling tinc-config..."
     mkdir -p /etc/tinc
     ( cd /etc/tinc; \
-      $GIT_WITH_CRED clone git@github.com:wacky6/tinc-config \
+      eval $GIT_WITH_CRED clone git@github.com:wacky6/tinc-config \
         --branch overlay --depth 1 overlay;
     )
 
@@ -92,11 +92,11 @@ if [ ! -d /etc/tinc/overlay ]; then
     # push tinc to upstream
     echo "###### Pushing to upstream"
     ( cd /etc/tinc/overlay; \
-      $GIT_WITH_CRED config user.email "$(hostname)-admin@wacky.one"; \
-      $GIT_WITH_CRED config user.name "$(hostname)"; \
-      $GIT_WITH_CRED add hosts/; \
-      $GIT_WITH_CRED commit -m "add $( hostname )"; \
-      $GIT_WITH_CRED push origin overlay;
+      eval $GIT_WITH_CRED config user.email "$(hostname)-admin@wacky.one"; \
+      eval $GIT_WITH_CRED config user.name "$(hostname)"; \
+      eval $GIT_WITH_CRED add hosts/; \
+      eval $GIT_WITH_CRED commit -m "add $( hostname )"; \
+      eval $GIT_WITH_CRED push origin overlay;
     )
 else
     echo "tinc-config exists, skipping."
