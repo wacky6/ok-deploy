@@ -9,7 +9,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 $UPDATE
 $INSTALL \
-    build-essential \
+    build-essential locales \
     vim \
     curl wget aria2 \
     iftop iotop htop nethogs iperf3 net-tools iputils-ping dnsutils \
