@@ -65,3 +65,12 @@ _install_crontab () {
 }
 
 _install_crontab
+
+# Set as default shell for screen
+SCREEN_RC=$HOME/.screenrc
+CUR_SCREENRC_SHELL=$( grep "shell " $SCREEN_RC 2>/dev/null )
+if [ ! -z "$CUR_SCREENRC_SHELL" ]; then
+    echo "screenrc already contains a shell directive, skipping setting zsh"
+else
+    echo "shell \"$( which zsh )\""
+fi
