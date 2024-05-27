@@ -53,7 +53,7 @@ _install_crontab () {
   HOME_DIR=$HOME
   crontab -l | {
     cat ;
-    echo "$RAND_MIN 5 * * * ( echo $CMD_PREFIX ; cd "${HOME_DIR}/my_zshrc" ; git fetch origin && git merge --ff-only origin/master ) "
+    echo "$RAND_MIN 5 * * * ( echo $CMD_PREFIX ; cd "${HOME_DIR}/my_zshrc" ; git fetch origin && git merge --ff-only origin/master ; "${HOME_DIR}/.oh-my-zsh/tools/upgrade.sh" "
   } | crontab -
 
   if [ "$?" == "0" ] ; then
