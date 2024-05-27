@@ -73,4 +73,5 @@ if [ ! -z "$CUR_SCREENRC_SHELL" ]; then
     echo "screenrc already contains a shell directive, skipping setting zsh"
 else
     echo "shell \"$( which zsh )\"" >> $SCREEN_RC
+    echo "Set zsh as default shell in .screenrc"
 fi
