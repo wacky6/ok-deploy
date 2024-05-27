@@ -14,7 +14,7 @@ $INSTALL \
     curl wget aria2 \
     iftop iotop htop nethogs iperf3 net-tools \
     traceroute mtr-tiny \
-    jq sed iproute2
+    jq sed iproute2 cron
 $UPGRADE
 update-alternatives --set editor $( realpath $( which vim ) )
 
