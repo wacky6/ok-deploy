@@ -72,5 +72,5 @@ CUR_SCREENRC_SHELL=$( grep "shell " $SCREEN_RC 2>/dev/null )
 if [ ! -z "$CUR_SCREENRC_SHELL" ]; then
     echo "screenrc already contains a shell directive, skipping setting zsh"
 else
-    echo "shell \"$( which zsh )\""
+    echo "shell \"$( which zsh )\"" >> $SCREEN_RC
 fi
