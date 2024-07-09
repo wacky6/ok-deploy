@@ -53,7 +53,7 @@ _install_crontab () {
   HOME_DIR=$HOME
   crontab -l | {
     cat ;
-    echo "$RAND_MIN 5 * * * ( echo $CMD_PREFIX ; cd "${HOME_DIR}/my_zshrc" ; git fetch origin && git merge --ff-only origin/master ) "
+    echo "$RAND_MIN 5 * * * ( echo $CMD_PREFIX ; cd "${HOME_DIR}/my_zshrc" ; git fetch origin && git merge --ff-only origin/master ; "${HOME_DIR}/.oh-my-zsh/tools/upgrade.sh" ) "
   } | crontab -
 
   if [ "$?" == "0" ] ; then
@@ -65,3 +65,14 @@ _install_crontab () {
 }
 
 _install_crontab
+
+# Set as default shell for screen
+SCREEN_RC=$HOME/.screenrc
+CUR_SCREENRC_SHELL=$( grep "shell " $SCREEN_RC 2>/dev/null )
+if [ ! -z "$CUR_SCREENRC_SHELL" ]; then
+    echo ".screenrc already contains a shell directive, skipping setting zsh."
+    echo "Current .screenrc: $CUR_SCREENRC_SHELL"
+else
+    echo "shell \"$( which zsh )\"" >> $SCREEN_RC
+    echo "Set zsh as default shell in .screenrc"
+fi
