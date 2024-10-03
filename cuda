@@ -5,12 +5,12 @@ INSTALL='apt install -y'
 
 export DEBIAN_FRONTEND=noninteractive
 
-DISTRO=ubuntu2204
+DISTRO=ubuntu2404
 ARCH=x86_64
 
-curl -LO https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.0-1_all.deb
-dpkg -i cuda-keyring_1.0-1_all.deb
-rm -f cuda-keyring_1.0-1_all.deb
+curl -LO https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.1-1_all.deb
+dpkg -i cuda-keyring_1.1-1_all.deb
+rm -f cuda-keyring_1.1-1_all.deb
 
 $UPDATE
-$INSTALL cuda libcudnn8 libcudnn8-dev
+$INSTALL cuda
