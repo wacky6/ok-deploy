@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+
+IDENTITY_FILE="/root/.ssh/id_ed25519_tinc_config"
+
+if [ -f $IDENTITY_FILE ]; then
+  echo "Found tinc-config credential."
+  GIT_SSH_COMMAND="ssh -i $IDENTITY_FILE \
+    -o StrictHostKeyChecking=no \
+    -o IdentitiesOnly=yes \
+    -o UserKnownHostsFile=/dev/null"
+  export GIT_WITH_CRED="GIT_SSH_COMMAND='$GIT_SSH_COMMAND' git"
+else
+  echo "Assuming local SSH credential has access to the config repo."
+  export GIT_WITH_CRED="git"
+fi
+
+( cd /etc/tinc/overlay ; \
+  eval $GIT_WITH_CRED fetch origin overlay ; \
+  eval $GIT_WITH_CRED reset --hard origin/overlay ; \
+)
+
