@@ -95,7 +95,7 @@ if [ ! -d /etc/tinc/overlay ]; then
       eval $GIT_WITH_CRED config user.email "$(hostname)-admin@wacky.one"; \
       eval $GIT_WITH_CRED config user.name "$(hostname)"; \
       eval $GIT_WITH_CRED add hosts/; \
-      eval $GIT_WITH_CRED commit -m "add $( hostname )"; \
+      eval $GIT_WITH_CRED commit -m \"add $( hostname )\"; \
       eval $GIT_WITH_CRED push origin overlay;
     )
 else
