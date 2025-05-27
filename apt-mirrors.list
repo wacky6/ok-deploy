@@ -1,0 +1,35 @@
+# apt-mirror config for repo mirror servers
+# Use https://github.com/electricworry/apt-mirror.git to support CNF
+
+set base_path    /mirrors/deb-repo
+set nthreads     4
+set defaultarch  amd64
+set _tilde 0
+
+# BEGIN: Mirrored DEB repos
+
+# OS repo
+deb http://au.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb http://au.archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+clean http://au.archive.ubuntu.com/ubuntu
+
+# NVIDIA CUDA
+deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64 /
+clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64
+deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64 /
+clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64
+
+# Nginx
+deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/mainline/ubuntu noble nginx
+clean http://nginx.org/packages/mainline/ubuntu
+
+# Docker
+deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable
+deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable
+clean https://download.docker.com/linux/ubuntu
