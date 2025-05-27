@@ -66,6 +66,7 @@ if [[ "\$STATUS" != "\$LAST_STATUS" ]]; then
     echo "" >> \$TG_HTML
     echo "Now: <b><code>\$STATUS</code></b>" >> \$TG_HTML
     echo "Was: <s><code>\$LAST_STATUS</code></s>" >> \$TG_HTML
+    echo "Host: \$(hostname -a)" >> \$TG_HTML
     echo "Time: \$(date)" >> \$TG_HTML
 
     if [[ \$STATUS == 0 ]] ; then
