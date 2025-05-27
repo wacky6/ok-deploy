@@ -59,34 +59,34 @@ LAST_STATUS="\$( cat $LAST_RUN_STATUS_FILE )"
 echo -n \$STATUS > $LAST_RUN_STATUS_FILE
 
 if [[ "\$STATUS" != "\$LAST_STATUS" ]]; then
-    TG_HTML=\$( mktemp )
+  TG_HTML=\$( mktemp )
 
-    [[ \$STATUS == 0 ]] && FACE="✅" || FACE="❌"
-    echo "\$FACE apt-mirror cron status changed:" >> \$TG_HTML
+  [[ \$STATUS == 0 ]] && FACE="✅" || FACE="❌"
+  echo "\$FACE apt-mirror cron status changed:" >> \$TG_HTML
+  echo "" >> \$TG_HTML
+  echo "Now: <b><code>\$STATUS</code></b>" >> \$TG_HTML
+  echo "Was: <s><code>\$LAST_STATUS</code></s>" >> \$TG_HTML
+  echo "Host: \$(hostname -a)" >> \$TG_HTML
+  echo "Time: \$(date)" >> \$TG_HTML
+
+  if [[ \$STATUS == 0 ]] ; then
     echo "" >> \$TG_HTML
-    echo "Now: <b><code>\$STATUS</code></b>" >> \$TG_HTML
-    echo "Was: <s><code>\$LAST_STATUS</code></s>" >> \$TG_HTML
-    echo "Host: \$(hostname -a)" >> \$TG_HTML
-    echo "Time: \$(date)" >> \$TG_HTML
+    echo "Log:" >> \$TG_HTML
+    echo -n "<pre>">> \$TG_HTML
+    cat /var/log/apt-mirror.log >> \$TG_HTML
+    echo "" >> \$TG_HTML
+    echo "</pre>">> \$TG_HTML
+  fi
 
-    if [[ \$STATUS == 0 ]] ; then
-      echo "" >> \$TG_HTML
-      echo "Log:" >> \$TG_HTML
-      echo -n "<pre>">> \$TG_HTML
-      cat /var/log/apt-mirror.log >> \$TG_HTML
-      echo "" >> \$TG_HTML
-      echo "</pre>">> \$TG_HTML
-    fi
+  ESCAPED_NOTIFICATION=\$( cat \$TG_HTML | jq -Rsa . )
 
-    ESCAPED_NOTIFICATION=\$( cat \$TG_HTML | jq -Rsa . )
-
-    # Send telegram notification
-    curl -vL -X POST \\
-        --header 'Content-Type: application/json' \\
-        --data-ascii "{\"chat_id\": \"\$TG_Chat_Id\", \"parse_mode\": \"HTML\", \"text\": \$ESCAPED_NOTIFICATION, \"disable_notification\": true }" \\
-        https://api.telegram.org/bot${TG_Token}/sendMessage
-    
-    rm -rf \$TG_HTML
+  # Send telegram notification
+  curl -vL -X POST \\
+      --header 'Content-Type: application/json' \\
+      --data-ascii "{\"chat_id\": \"\$TG_Chat_Id\", \"parse_mode\": \"HTML\", \"text\": \$ESCAPED_NOTIFICATION, \"disable_notification\": true }" \\
+      https://api.telegram.org/bot${TG_Token}/sendMessage
+  
+  rm -rf \$TG_HTML
 else
     echo "No need to send status update."
 fi
