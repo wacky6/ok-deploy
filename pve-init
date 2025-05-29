@@ -11,7 +11,7 @@ fi
 
 # Assume it's debian :)
 apt update
-apt install -y lm-sensors linux-cpupower net-tools lldpd
+apt install -y lm-sensors linux-cpupower net-tools lldpd vim git
 
 # Be energy conscious :)
 SYSTEMD_POWER_TUNING_SERVICE=ok-deploy-cpu-tuning
