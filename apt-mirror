@@ -54,7 +54,7 @@ fi
 
 ${INSTALL_DIR}/${RUN_WRAPPER} | tee $LAST_RUN_LOG_FILE
 
-STATUS=$?
+STATUS=\$?
 LAST_STATUS="\$( cat $LAST_RUN_STATUS_FILE )"
 echo -n \$STATUS > $LAST_RUN_STATUS_FILE
 
@@ -83,7 +83,7 @@ if [[ "\$STATUS" != "\$LAST_STATUS" ]]; then
   # Send telegram notification
   curl -vL -X POST \\
       --header 'Content-Type: application/json' \\
-      --data-ascii "{\"chat_id\": \"\$TG_Chat_Id\", \"parse_mode\": \"HTML\", \"text\": \$ESCAPED_NOTIFICATION, \"disable_notification\": true }" \\
+      --data-ascii "{\"chat_id\": \"${TG_Chat_Id}\", \"parse_mode\": \"HTML\", \"text\": \$ESCAPED_NOTIFICATION, \"disable_notification\": true }" \\
       https://api.telegram.org/bot${TG_Token}/sendMessage
   
   rm -rf \$TG_HTML
@@ -96,6 +96,6 @@ chmod +x $_CRON_WRAPPER
 echo "Writing cron config."
 cat > /etc/cron.d/apt-mirror << _EOF_
 # Minute Hour Day_of_Month Month Day_of_Week RunAsUser Command
-0 5          * * *                          root      ${INSTALL_DIR}/${_CRON_WRAPPER}
+0 5          * * *                          root      ${_CRON_WRAPPER}
 _EOF_
 
