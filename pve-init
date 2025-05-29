@@ -13,6 +13,11 @@ fi
 apt update
 apt install -y lm-sensors linux-cpupower net-tools lldpd vim git iftop
 
+# LLDP configuration (experimental)
+echo 'DAEMON_ARGS="-x -c -s -e"' | sudo tee /etc/default/lldpd
+lldpcli configure system interface pattern "*"
+systemctl restart lldpd
+
 # Be energy conscious :)
 SYSTEMD_POWER_TUNING_SERVICE=ok-deploy-cpu-tuning
 cat > /etc/systemd/system/${SYSTEMD_POWER_TUNING_SERVICE}.service <<-_EOF_
