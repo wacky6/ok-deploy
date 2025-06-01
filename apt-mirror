@@ -98,4 +98,3 @@ cat > /etc/cron.d/apt-mirror << _EOF_
 # Minute Hour Day_of_Month Month Day_of_Week RunAsUser Command
 0 5          * * *                          root      ${_CRON_WRAPPER}
 _EOF_
-
