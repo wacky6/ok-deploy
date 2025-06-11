@@ -1,0 +1,88 @@
+#!/bin/bash
+
+set -euo pipefail
+
+PROBE_BIN=/usr/bin/pvedaemon
+if ! test -f $PROBE_BIN ; then
+  echo "Doesn't look like a PVE installation: ${PROBE_BIN} not found."
+  echo "Bail out!"
+  exit 1
+fi
+
+# Assume it's debian :)
+apt update
+apt install -y lm-sensors linux-cpupower net-tools lldpd vim git iftop
+
+# LLDP configuration (experimental)
+echo 'DAEMON_ARGS="-x -c -s -e"' | tee /etc/default/lldpd
+lldpcli configure system interface pattern "*"
+systemctl restart lldpd
+
+# Be energy conscious :)
+SYSTEMD_POWER_TUNING_SERVICE=ok-deploy-cpu-tuning
+cat > /etc/systemd/system/${SYSTEMD_POWER_TUNING_SERVICE}.service <<-_EOF_
+[Unit]
+Description=CPU Power Tuning
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/cpupower frequency-set -g powersave
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+systemctl daemon-reload
+systemctl enable ${SYSTEMD_POWER_TUNING_SERVICE}
+systemctl start ${SYSTEMD_POWER_TUNING_SERVICE}
+
+# Setup PVE checked command auto patch.
+#
+# Note, patch file contains tabs, so we base64 escape it to prevent most
+# editor's tab -> space feature from messing up its content.
+PATCH_FILE=/root/.pve_checked_command_patch
+{
+base64 -d <<-_EOF_
+LS0tIC91c3Ivc2hhcmUvamF2YXNjcmlwdC9wcm94bW94LXdpZGdldC10b29sa2l0L3Byb3htb3hs
+aWIuanMJMjAyNS0wNC0wOSAwMTozNjo1Ni4wMDAwMDAwMDAgKzEwMDAKKysrIC90bXAvYWZ0ZXIu
+anMJMjAyNS0wNS0yMiAyMDoyNTozNS4zMjc0ODkwMDkgKzEwMDAKQEAgLTU1MiwzNSArNTUyLDgg
+QEAKICAgICBhbGVydFJlc3BvbnNlRmFpbHVyZTogcmVzID0+IEV4dC5Nc2cuYWxlcnQoZ2V0dGV4
+dCgnRXJyb3InKSwgcmVzLmh0bWxTdGF0dXMgfHwgcmVzLnJlc3VsdC5tZXNzYWdlKSwKIAogICAg
+IGNoZWNrZWRfY29tbWFuZDogZnVuY3Rpb24ob3JpZ19jbWQpIHsKLQlQcm94bW94LlV0aWxzLkFQ
+STJSZXF1ZXN0KAotCSAgICB7Ci0JCXVybDogJy9ub2Rlcy9sb2NhbGhvc3Qvc3Vic2NyaXB0aW9u
+JywKLQkJbWV0aG9kOiAnR0VUJywKLQkJZmFpbHVyZTogZnVuY3Rpb24ocmVzcG9uc2UsIG9wdHMp
+IHsKLQkJICAgIEV4dC5Nc2cuYWxlcnQoZ2V0dGV4dCgnRXJyb3InKSwgcmVzcG9uc2UuaHRtbFN0
+YXR1cyk7Ci0JCX0sCi0JCXN1Y2Nlc3M6IGZ1bmN0aW9uKHJlc3BvbnNlLCBvcHRzKSB7Ci0JCSAg
+ICBsZXQgcmVzID0gcmVzcG9uc2UucmVzdWx0OwotCQkgICAgaWYgKHJlcyA9PT0gbnVsbCB8fCBy
+ZXMgPT09IHVuZGVmaW5lZCB8fCAhcmVzIHx8IHJlcwotCQkJLmRhdGEuc3RhdHVzLnRvTG93ZXJD
+YXNlKCkgIT09ICdhY3RpdmUnKSB7Ci0JCQlFeHQuTXNnLnNob3coewotCQkJICAgIHRpdGxlOiBn
+ZXR0ZXh0KCdObyB2YWxpZCBzdWJzY3JpcHRpb24nKSwKLQkJCSAgICBpY29uOiBFeHQuTXNnLldB
+Uk5JTkcsCi0JCQkgICAgbWVzc2FnZTogUHJveG1veC5VdGlscy5nZXROb1N1YktleUh0bWwocmVz
+LmRhdGEudXJsKSwKLQkJCSAgICBidXR0b25zOiBFeHQuTXNnLk9LLAotCQkJICAgIGNhbGxiYWNr
+OiBmdW5jdGlvbihidG4pIHsKLQkJCQlpZiAoYnRuICE9PSAnb2snKSB7Ci0JCQkJICAgIHJldHVy
+bjsKLQkJCQl9Ci0JCQkJb3JpZ19jbWQoKTsKLQkJCSAgICB9LAotCQkJfSk7Ci0JCSAgICB9IGVs
+c2UgewotCQkJb3JpZ19jbWQoKTsKLQkJICAgIH0KLQkJfSwKLQkgICAgfSwKLQkpOworICAgICAg
+ICAvLyBNQUdJQzpDSEVDS19DT01NQU5EX1BBVENIRUQKKyAgICAgICAgb3JpZ19jbWQoKTsKICAg
+ICB9LAogCiAgICAgYXNzZW1ibGVfZmllbGRfZGF0YTogZnVuY3Rpb24odmFsdWVzLCBkYXRhKSB7
+Cg==
+_EOF_
+} | cat > $PATCH_FILE
+
+APT_HOOK=/root/.pve_checked_command_apt_hook
+cat > $APT_HOOK <<-_EOF_
+#!/usr/bin/bash
+FILE=/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+if grep -q 'MAGIC:CHECK_COMMAND_PATCHED' \$FILE ; then 
+  echo "PVE checked_command already patched"
+else
+  patch \$FILE $PATCH_FILE 
+fi
+_EOF_
+chmod +x $APT_HOOK
+
+cat > /etc/apt/apt.conf.d/99okdeploy_checked_command_patch <<-_EOF_
+DPkg::Post-Invoke {"$APT_HOOK";}
+_EOF_
+
+export DEBIAN_FRONTEND=noninteractive
+apt update
+apt upgrade -y
