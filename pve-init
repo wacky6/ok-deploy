@@ -14,7 +14,7 @@ apt update
 apt install -y lm-sensors linux-cpupower net-tools lldpd vim git iftop
 
 # LLDP configuration (experimental)
-echo 'DAEMON_ARGS="-x -c -s -e"' | sudo tee /etc/default/lldpd
+echo 'DAEMON_ARGS="-x -c -s -e"' | tee /etc/default/lldpd
 lldpcli configure system interface pattern "*"
 systemctl restart lldpd
 
