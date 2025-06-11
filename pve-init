@@ -82,3 +82,7 @@ chmod +x $APT_HOOK
 cat > /etc/apt/apt.conf.d/99okdeploy_checked_command_patch <<-_EOF_
 DPkg::Post-Invoke {"$APT_HOOK";}
 _EOF_
+
+export DEBIAN_FRONTEND=noninteractive
+apt update
+apt upgrade -y
