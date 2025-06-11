@@ -24,7 +24,7 @@ if [ -z "${TG_Token+set}" -o -z "${TG_Chat_Id+set}" ] ; then
 fi
 
 $UPDATE
-$INSTALL git curl cron jq
+$INSTALL git curl cron jq bzip2
 
 rm -rf "${INSTALL_DIR}/apt-mirror"
 ( cd $INSTALL_DIR ; git clone $APT_MIRROR_REPO && cd apt-mirror && git checkout $APT_MIRROR_COMMIT )
