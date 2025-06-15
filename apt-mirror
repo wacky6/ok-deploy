@@ -1,0 +1,100 @@
+#!/bin/bash
+
+set -euo pipefail
+
+UPDATE='apt update'
+INSTALL='apt install -y'
+
+APT_MIRROR_REPO=https://github.com/electricworry/apt-mirror.git
+APT_MIRROR_COMMIT=bd4480f
+MIRROR_CONFIG_URL=https://raw.githubusercontent.com/wacky6/ok-deploy/refs/heads/master/apt-mirrors.list
+INSTALL_DIR=/root
+RUN_WRAPPER=.apt-mirror-update-list-and-sync
+CRON_WRAPPER=.apt-mirror-cron
+LAST_RUN_LOG_FILE=/var/log/apt-mirror.log
+LAST_RUN_STATUS_FILE=/var/log/apt-mirror-last-run-status
+
+if [ -z "${TG_Token+set}" -o -z "${TG_Chat_Id+set}" ] ; then
+    echo "Telegram notifications not set."
+    echo "Please set the following environment variables:"
+    echo ""
+    echo '  export TG_Token=bot_id:secret'
+    echo '  export TG_Chat_Id=xxxxx'
+    exit 2
+fi
+
+$UPDATE
+$INSTALL git curl cron jq bzip2
+
+rm -rf "${INSTALL_DIR}/apt-mirror"
+( cd $INSTALL_DIR ; git clone $APT_MIRROR_REPO && cd apt-mirror && git checkout $APT_MIRROR_COMMIT )
+
+# Write apt-mirror wrapper with auto-sync mirror list config.
+echo "Writing cron command."
+_RUN_WRAPPER="${INSTALL_DIR}/${RUN_WRAPPER}"
+cat > $_RUN_WRAPPER << _EOF_
+#!/bin/bash
+set -euo pipefail
+
+curl -vL $MIRROR_CONFIG_URL > /etc/apt/mirror.list
+${INSTALL_DIR}/apt-mirror/apt-mirror
+_EOF_
+chmod +x $_RUN_WRAPPER
+
+# Write cron wrapper with Telegram notification.
+echo "Writing cron launcher."
+_CRON_WRAPPER="${INSTALL_DIR}/${CRON_WRAPPER}"
+cat > $_CRON_WRAPPER << _EOF_
+#!/bin/bash
+set -euo pipefail
+
+if [ ! -f $LAST_RUN_STATUS_FILE ] ; then
+  echo -n "NEVER_RUN" > $LAST_RUN_STATUS_FILE
+fi
+
+${INSTALL_DIR}/${RUN_WRAPPER} | tee $LAST_RUN_LOG_FILE
+
+STATUS=\$?
+LAST_STATUS="\$( cat $LAST_RUN_STATUS_FILE )"
+echo -n \$STATUS > $LAST_RUN_STATUS_FILE
+
+if [[ "\$STATUS" != "\$LAST_STATUS" ]]; then
+  TG_HTML=\$( mktemp )
+
+  [[ \$STATUS == 0 ]] && FACE="✅" || FACE="❌"
+  echo "\$FACE apt-mirror cron status changed:" >> \$TG_HTML
+  echo "" >> \$TG_HTML
+  echo "Now: <b><code>\$STATUS</code></b>" >> \$TG_HTML
+  echo "Was: <s><code>\$LAST_STATUS</code></s>" >> \$TG_HTML
+  echo "Host: \$(hostname -f)" >> \$TG_HTML
+  echo "Time: \$(date)" >> \$TG_HTML
+
+  if [[ \$STATUS == 0 ]] ; then
+    echo "" >> \$TG_HTML
+    echo "Log:" >> \$TG_HTML
+    echo -n "<pre>">> \$TG_HTML
+    cat /var/log/apt-mirror.log >> \$TG_HTML
+    echo "" >> \$TG_HTML
+    echo "</pre>">> \$TG_HTML
+  fi
+
+  ESCAPED_NOTIFICATION=\$( cat \$TG_HTML | jq -Rsa . )
+
+  # Send telegram notification
+  curl -vL -X POST \\
+      --header 'Content-Type: application/json' \\
+      --data-ascii "{\"chat_id\": \"${TG_Chat_Id}\", \"parse_mode\": \"HTML\", \"text\": \$ESCAPED_NOTIFICATION, \"disable_notification\": true }" \\
+      https://api.telegram.org/bot${TG_Token}/sendMessage
+  
+  rm -rf \$TG_HTML
+else
+    echo "No need to send status update."
+fi
+_EOF_
+chmod +x $_CRON_WRAPPER
+
+echo "Writing cron config."
+cat > /etc/cron.d/apt-mirror << _EOF_
+# Minute Hour Day_of_Month Month Day_of_Week RunAsUser Command
+0 5          * * *                          root      ${_CRON_WRAPPER}
+_EOF_
