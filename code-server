@@ -13,6 +13,20 @@ USER=${USER:-$(id -u -n)}
 # POSIX: https://pubs.opengroup.org/onlinepubs/009696899/basedefs/xbd_chap08.html#tag_08_03
 HOME="${HOME:-$(getent passwd $USER 2>/dev/null | cut -d: -f6)}"
 
+# Address to bind.
+BIND_ADDR="localhost"
+
+# Parse command line args.
+while (( "$#" > 0 )); do
+  if [ "$1" == "--open" -o "$1" == "-o" ] ; then
+    # Bind to ipv4 wildcard address.
+    BIND_ADDR="0.0.0.0"
+    echo -e "${C_F_Red}WARNING: Binding to 0.0.0.0 requested.${C_f}"
+    echo -e "${C_F_Red} -> The deployed code-server instance will be reachable by ANY ipv4 host.${C_f}"
+  fi
+  shift
+done
+
 if [ $USER == "root" ] ; then
   UPDATE="apt update -y"
   INSTALL="apt install -y"
@@ -146,7 +160,7 @@ Environment=NODE_OPTIONS=--max-old-space-size=16384
 # \`--user-data-dir=%h/.%N\` creates a per-project configuration (based on unit file name)
 ExecStart=%h/code-server/bin/code-server \\
     --auth none \\
-    --bind-addr localhost:\${PORT} \\
+    --bind-addr ${BIND_ADDR}:\${PORT} \\
     --user-data-dir %h/.%N \\
     \${CODE_DIR}
 
@@ -170,3 +184,5 @@ _EOF_
   
   echo -e "${C_F_Yellow}Done.${C_f}"
 fi
+
+echo -e  ${C_F_Yellow}[FYI] IPv4 Addresses: \\n"$( ip -4 -o addr show | awk '{print $4}' | grep -v '^127\.' | awk -F '/' '{print "    " $1}' )"${C_f}
