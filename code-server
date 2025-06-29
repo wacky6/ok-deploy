@@ -184,3 +184,5 @@ _EOF_
   
   echo -e "${C_F_Yellow}Done.${C_f}"
 fi
+
+echo -e  ${C_F_Yellow}[FYI] IPv4 Addresses: \\n"$( ip -4 -o addr show | awk '{print $4}' | grep -v '^127\.' | awk -F '/' '{print "    " $1}' )"${C_f}
