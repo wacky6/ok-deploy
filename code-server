@@ -21,8 +21,8 @@ while (( "$#" > 0 )); do
   if [ "$1" == "--open" -o "$1" == "-o" ] ; then
     # Bind to ipv4 wildcard address.
     BIND_ADDR="0.0.0.0"
-    echo -e "${C_F_Yellow}WARNING: Binding to 0.0.0.0 requested.${C_f}"
-    echo -e "${C_F_Yellow} -> The deployed code-server instance will be reachable by ANY ipv4 host.${C_f}"
+    echo -e "${C_F_Red}WARNING: Binding to 0.0.0.0 requested.${C_f}"
+    echo -e "${C_F_Red} -> The deployed code-server instance will be reachable by ANY ipv4 host.${C_f}"
   fi
   shift
 done
