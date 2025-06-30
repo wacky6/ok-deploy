@@ -32,8 +32,8 @@ script_need_update_and_exit() {
 UPDATE='apt update'
 INSTALL='apt install -y'
 
-# $UPDATE
-# $INSTALL curl jq tar gzip bzip2 xz-utils base58 openssl
+$UPDATE
+$INSTALL curl jq tar gzip bzip2 xz-utils base58 openssl
 
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
