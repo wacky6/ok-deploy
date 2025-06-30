@@ -2,11 +2,16 @@
 
 set -euo pipefail
 
+# Magic
+M1=$( echo funqbjfbpxf | tr 'A-Za-z' 'N-ZA-Mn-za-m' )
+M1U=${M1^}
+M2=$( echo fffreire | tr 'A-Za-z' 'N-ZA-Mn-za-m' )
+
 # Const
-INSTALL_DIR="/root/shadowsocks"
-SSR_REPO="shadowsocks/shadowsocks-rust"
+INSTALL_DIR="/root/${M1}"
+SSR_REPO="${M1}/${M1}-rust"
 SSR_RELEASE="latest"
-SSR_SERVER_BINARY="ssserver"
+SSR_SERVER_BINARY="${M2}"
 KCP_REPO="xtaci/kcptun"
 KCP_RELEASE="latest"
 KCP_SERVER_BINARY="kcp_server"  # After rename
@@ -95,9 +100,9 @@ SSR_KEY=$( head -c 12 /dev/random | base58 )
 SSR_ENCRYPT="chacha20-ietf-poly1305"
 SSR_DNS="1.1.1.1,8.8.8.8"
 SSR_LISTEN="127.0.0.1:7373"
-cat > /etc/systemd/system/shadowsocks.service <<_EOF_
+cat > /etc/systemd/system/${M1}.service <<_EOF_
 [Unit]
-Description=Shadowsocks Rust Server
+Description=${M1U} Server
 After=network.target
 
 [Service]
@@ -126,9 +131,9 @@ KCP_MODE=fast3
 KCP_ENC=aes
 KCP_KEY=$( head -c 12 /dev/random | base58 )
 KCP_PORT=$(( RANDOM % 8192 + 1024 ))
-cat > /etc/systemd/system/shadowsocks-kcp.service <<_EOF_
+cat > /etc/systemd/system/${M1}-kcp.service <<_EOF_
 [Unit]
-Description=KCP passthrough to Shadowsocks
+Description=KCP passthrough to ${M1U}
 After=network.target
 
 [Service]
@@ -153,10 +158,10 @@ _EOF_
 
 # Start services
 systemctl daemon-reload
-systemctl enable shadowsocks
-systemctl enable shadowsocks-kcp
-systemctl restart shadowsocks
-systemctl restart shadowsocks-kcp
+systemctl enable ${M1}
+systemctl enable ${M1}-kcp
+systemctl restart ${M1}
+systemctl restart ${M1}-kcp
 
 # Print Summary
 echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
@@ -164,8 +169,8 @@ echo -e "${C_F_Yellow}- Addresses:${C_f}"
 ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }'
 ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }'
 
-#    Summary Shadowsocks
-echo -e "${C_F_Yellow}- Shadowsocks:${C_f}"
+#    Summary for ${M1U}
+echo -e "${C_F_Yellow}- ${M1U}:${C_f}"
 echo "       Port: $KCP_PORT"
 echo "        Key: $SSR_KEY"
 echo "       Algo: $SSR_ENCRYPT"
