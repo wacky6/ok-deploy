@@ -107,7 +107,7 @@ ExecStart=$INSTALL_DIR/$SSR_SERVER_BINARY \
     --password "$SSR_KEY" \
     --encrypt-method "$SSR_ENCRYPT" \
     --dns "$SSR_DNS" \
-    -6
+    -v -6
 Restart=always
 
 [Install]
@@ -155,8 +155,8 @@ _EOF_
 systemctl daemon-reload
 systemctl enable shadowsocks
 systemctl enable shadowsocks-kcp
-systemctl start shadowsocks
-systemctl start shadowsocks-kcp
+systemctl restart shadowsocks
+systemctl restart shadowsocks-kcp
 
 # Print Summary
 echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
@@ -164,19 +164,21 @@ echo -e "${C_F_Yellow}- Addresses:${C_f}"
 ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }'
 ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }'
 
-#    Summary: KCP
-echo -e "${C_F_Yellow}- KCP:${C_f}"
-echo "       Port: $KCP_PORT"
-echo "        Key: $KCP_KEY"
-echo "       Algo: $KCP_ENC"
-echo "       Mode: $KCP_MODE"
-echo "  TX/RX Wnd: $KCP_WND"
-
 #    Summary Shadowsocks
 echo -e "${C_F_Yellow}- Shadowsocks:${C_f}"
-echo "       Port: NOT_AVAIL"
+echo "       Port: $KCP_PORT"
 echo "        Key: $SSR_KEY"
 echo "       Algo: $SSR_ENCRYPT"
+
+#    Summary: KCP
+echo -e "${C_F_Yellow}- KCP:${C_f}"
+echo "   Compress: No"
+echo "       Port: $KCP_PORT"
+echo "       Algo: $KCP_ENC"
+echo "       Mode: $KCP_MODE"
+echo "   SMux Ver: 2"
+echo "        Key: $KCP_KEY"
+echo "  TX/RX Wnd: $KCP_WND"
 
 # Blank line
 echo ""
