@@ -163,6 +163,14 @@ systemctl enable ${M1}-kcp
 systemctl restart ${M1}
 systemctl restart ${M1}-kcp
 
+# Stop ufw if it's enabled
+if ufw status | grep -q "Status: active"; then
+    echo "Disabling UFW"
+    ufw disable
+else
+    echo "UFW isn't enabled."
+fi
+
 # Print Summary
 echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
 echo -e "${C_F_Yellow}- Addresses:${C_f}"
@@ -179,7 +187,7 @@ echo "       Algo: $SSR_ENCRYPT"
 echo -e "${C_F_Yellow}- KCP:${C_f}"
 echo "   Compress: No"
 echo "       Port: $KCP_PORT"
-echo "       Algo: $KCP_ENC"
+echo "      Crypt: $KCP_ENC"
 echo "       Mode: $KCP_MODE"
 echo "   SMux Ver: 2"
 echo "        Key: $KCP_KEY"
