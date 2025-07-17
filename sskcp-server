@@ -1,0 +1,197 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Magic
+M1=$( echo funqbjfbpxf | tr 'A-Za-z' 'N-ZA-Mn-za-m' )
+M1U=${M1^}
+M2=$( echo fffreire | tr 'A-Za-z' 'N-ZA-Mn-za-m' )
+
+# Const
+INSTALL_DIR="/root/${M1}"
+SSR_REPO="${M1}/${M1}-rust"
+SSR_RELEASE="latest"
+SSR_SERVER_BINARY="${M2}"
+KCP_REPO="xtaci/kcptun"
+KCP_RELEASE="latest"
+KCP_SERVER_BINARY="kcp_server"  # After rename
+
+# Color text vars
+# This script needs to support bash, so we can't use ZSH style escape :(
+# Pull color escape codes from: https://stackoverflow.com/a/28938235
+C_f='\033[0m'
+C_F_Yellow='\033[0;33m'
+C_F_Red='\033[0;31m'
+
+# Print error and exit
+error_and_exit() {
+    echo "${C_F_Red}ERROR: $1${C_f}"
+    exit 1
+}
+
+script_need_update_and_exit() {
+    error_and_exit $1
+    echo "${C_F_Red} -> This script probably needs update.${C_f}"
+}
+
+UPDATE='apt update'
+INSTALL='apt install -y'
+
+$UPDATE
+$INSTALL curl jq tar gzip bzip2 xz-utils base58 openssl
+
+mkdir -p $INSTALL_DIR
+cd $INSTALL_DIR
+
+# arg1: string, "<owner>/<repo>"
+# arg2: string, release tag, like "latest"
+# arg3: string, jq filtering criteria, like 'contains("x86_64") and contains("linux")'
+get_release_url() {
+    DOWNLOAD_URL=$( \
+        curl -s "https://api.github.com/repos/$1/releases/$2" \
+        | jq -r ".assets[] | select(.name | $3) | .browser_download_url" \
+    )
+
+    if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
+        handle_error "No release matching criteria: ${CRITERIA}"
+    fi
+
+    if [[ "${DOWNLOAD_URL}" =~ [[:space:]] ]]; then
+        handle_error "Multipe releases found (found whitespaces in URL): ${DOWNLOAD_URL}"
+    fi
+
+    echo "$DOWNLOAD_URL"
+}
+
+extension_to_tar_flag() {
+    case $1 in
+        *.tar)
+            echo "" ;;
+        *.tar.gz|*.gzip|*.tgz)
+            echo "z" ;;
+        *.tar.xz)
+            echo "J" ;;
+        *.tar.bzip2|*.tar.bz2)
+            echo "j" ;;
+        *)
+            error_and_exit "Unhandled archive extension: $1" ;;
+    esac
+}
+
+is_exec_or_die() {
+    if [ ! -f "$1" ]; then
+        error_and_exit "File not found: $1"
+    elif [ ! -x "$1" ]; then
+        error_and_exit "File found but does not have executable permission: $1"
+    fi
+
+    echo -e Found executable file: "$1"
+}
+
+# SS-Rust
+SSR_BIN_CRITERIA='contains("x86_64") and contains("linux") and contains("gnu") and (contains(".sha256") | not)'
+SSR_DOWNLOAD_URL=$( get_release_url "$SSR_REPO" "$SSR_RELEASE" "$SSR_BIN_CRITERIA" )
+echo -e ${C_F_Yellow}Found release URL: ${SSR_DOWNLOAD_URL}${C_f}
+curl -L $SSR_DOWNLOAD_URL | tar x$( extension_to_tar_flag $SSR_DOWNLOAD_URL )
+is_exec_or_die $SSR_SERVER_BINARY
+
+# Write systemd unit file.
+SSR_KEY=$( head -c 12 /dev/random | base58 )
+SSR_ENCRYPT="chacha20-ietf-poly1305"
+SSR_DNS="1.1.1.1,8.8.8.8"
+SSR_LISTEN="127.0.0.1:7373"
+cat > /etc/systemd/system/${M1}.service <<_EOF_
+[Unit]
+Description=${M1U} Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$INSTALL_DIR/$SSR_SERVER_BINARY \
+    --server-addr "$SSR_LISTEN" \
+    --password "$SSR_KEY" \
+    --encrypt-method "$SSR_ENCRYPT" \
+    --dns "$SSR_DNS" \
+    -v -6
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+# KCP
+KCP_BIN_CRITERIA='contains("amd64") and contains("linux")'
+KCP_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
+echo -e ${C_F_Yellow}Found release URL: ${KCP_DOWNLOAD_URL}${C_f}
+curl -L $KCP_DOWNLOAD_URL | tar -x$( extension_to_tar_flag $KCP_DOWNLOAD_URL ) --transform 's/_linux_amd64//' --transform 's/^/kcp_/'
+is_exec_or_die $KCP_SERVER_BINARY
+
+KCP_WND=4096
+KCP_MODE=fast3
+KCP_ENC=aes
+KCP_KEY=$( head -c 12 /dev/random | base58 )
+KCP_PORT=$(( RANDOM % 8192 + 1024 ))
+cat > /etc/systemd/system/${M1}-kcp.service <<_EOF_
+[Unit]
+Description=KCP passthrough to ${M1U}
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$INSTALL_DIR/$KCP_SERVER_BINARY \
+    --listen :$KCP_PORT \
+    --target $SSR_LISTEN \
+    --key $KCP_KEY \
+    --crypt $KCP_ENC \
+    --mode $KCP_MODE \
+    --sndwnd $KCP_WND \
+    --rcvwnd $KCP_WND \
+    --nocomp \
+    --smuxver 2
+
+Restart=always
+LimitNOFILE=131072
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+# Start services
+systemctl daemon-reload
+systemctl enable ${M1}
+systemctl enable ${M1}-kcp
+systemctl restart ${M1}
+systemctl restart ${M1}-kcp
+
+# Stop ufw if it's enabled
+if ufw status | grep -q "Status: active"; then
+    echo "Disabling UFW"
+    ufw disable
+else
+    echo "UFW isn't enabled."
+fi
+
+# Print Summary
+echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
+echo -e "${C_F_Yellow}- Addresses:${C_f}"
+ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }'
+ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }'
+
+#    Summary for ${M1U}
+echo -e "${C_F_Yellow}- ${M1U}:${C_f}"
+echo "       Port: $KCP_PORT"
+echo "        Key: $SSR_KEY"
+echo "       Algo: $SSR_ENCRYPT"
+
+#    Summary: KCP
+echo -e "${C_F_Yellow}- KCP:${C_f}"
+echo "   Compress: No"
+echo "       Port: $KCP_PORT"
+echo "      Crypt: $KCP_ENC"
+echo "       Mode: $KCP_MODE"
+echo "   SMux Ver: 2"
+echo "        Key: $KCP_KEY"
+echo "  TX/RX Wnd: $KCP_WND"
+
+# Blank line
+echo ""
