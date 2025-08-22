@@ -9,15 +9,15 @@ set _tilde 0
 # BEGIN: Mirrored DEB repos
 
 # OS repo
-deb http://au.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb http://au.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb http://au.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-deb http://au.archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-deb [arch=i386] http://au.archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-clean http://au.archive.ubuntu.com/ubuntu
+deb https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+clean https://archive.ubuntu.com/ubuntu
 
 # NVIDIA CUDA
 deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64 /
