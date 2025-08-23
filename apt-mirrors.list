@@ -26,8 +26,8 @@ deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.d
 clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64
 
 # Nginx
-deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/mainline/ubuntu noble nginx
-clean http://nginx.org/packages/mainline/ubuntu
+deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/ubuntu noble nginx
+clean https://nginx.org/packages/mainline/ubuntu
 
 # Docker
 deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable
