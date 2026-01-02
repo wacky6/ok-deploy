@@ -6,7 +6,7 @@ UPDATE='apt update'
 INSTALL='apt install -y'
 
 APT_MIRROR_REPO=https://github.com/electricworry/apt-mirror.git
-APT_MIRROR_COMMIT=bd4480f
+APT_MIRROR_COMMIT=4aa6775
 MIRROR_CONFIG_URL=https://raw.githubusercontent.com/wacky6/ok-deploy/refs/heads/master/apt-mirrors.list
 INSTALL_DIR=/root
 RUN_WRAPPER=.apt-mirror-update-list-and-sync
