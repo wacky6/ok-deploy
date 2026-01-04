@@ -1,7 +1,9 @@
 # apt-mirror config for repo mirror servers
 # Use https://github.com/electricworry/apt-mirror.git to support CNF
 
-set base_path    /mirrors/deb-repo
+set mirror_path  /mirrors/deb-repo
+set var_path     /var/apt-mirror/var
+set skel_path    /var/apt-mirror/skel
 set nthreads     4
 set defaultarch  amd64
 set _tilde 0
