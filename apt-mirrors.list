@@ -11,14 +11,14 @@ set _tilde 0
 # BEGIN: Mirrored DEB repos
 
 # OS repo
-deb https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb https://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-deb https://archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-deb [arch=i386] https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble main universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-updates main universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-backports main universe multiverse
+deb https://archive.ubuntu.com/ubuntu noble-security main universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble main universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-updates main universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-backports main universe multiverse
+deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-security main universe multiverse
 clean https://archive.ubuntu.com/ubuntu
 
 # NVIDIA CUDA
