@@ -8,7 +8,7 @@ PREFIXES="--prefix=/usr --exec-prefix=/usr --sysconfdir=/etc --localstatedir=/va
 GCC_FLAGS="-g -march=x86-64 -O3 -fPIE \
   -Wall -Wconversion -fwrapv \
   -fstack-protector-strong \
-  -DFORTIFY_SOURCE=2"
+  -D_FORTIFY_SOURCE=2"
 IDENTITY_FILE="/root/.ssh/id_ed25519_tinc_config"
 
 CORES=`grep -c processor < /proc/cpuinfo`
