@@ -1,0 +1,65 @@
+#!/bin/bash
+
+set -euo pipefail
+
+HOME=${HOME:-/root}
+REPO="rclone/rclone"
+
+case "$(uname -s)" in
+    Linux)  OS="linux" ;;
+    Darwin) OS="osx" ;;
+    *)      echo "Unsupported OS: $(uname -s)"; exit 1 ;;
+esac
+
+case "$(uname -m)" in
+    x86_64)        ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *)             echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+esac
+
+RELEASE=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+ARCHIVE="rclone-${TAG}-${OS}-${ARCH}.zip"
+URL=$(echo "$RELEASE" | jq -r --arg name "$ARCHIVE" '.assets[] | select(.name == $name) | .browser_download_url')
+
+if [ -z "$URL" ] || [ "$URL" = "null" ]; then
+    echo "No release asset: $ARCHIVE"
+    exit 1
+fi
+
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+echo "Downloading ${ARCHIVE} ..."
+curl -fsSL "$URL" -o "$TMPDIR/$ARCHIVE"
+unzip -q -o "$TMPDIR/$ARCHIVE" -d "$TMPDIR"
+cp "$TMPDIR/rclone-${TAG}-${OS}-${ARCH}/rclone" "$HOME/rclone"
+chmod +x "$HOME/rclone"
+echo "Installed: ~/rclone (${TAG})"
+
+# Add endpoints.
+add_s3_endpoint() {
+    local name="$1"
+    local url="$2"
+    echo "Configuring rclone S3 endpoint: $name -> $url"
+    
+    # We set env_auth=false and no_check_bucket=true to optimize anonymous/write-only usage
+    "$HOME/rclone" config create "$name" s3 \
+        provider Other \
+        endpoint "$url" \
+        env_auth false \
+        no_check_bucket true > /dev/null
+}
+echo ""
+echo "============================================================"
+add_s3_endpoint "syd" "https://oss.syd.wacky.one"
+echo "============================================================"
+
+echo ""
+echo "============================================================"
+echo "To add Access Key (AK) and Secret Key (SK):"
+echo "  $HOME/rclone config update <ALIAS> access_key_id <AK> secret_access_key <SK>"
+echo ""
+echo "To safely upload anonymously:"
+echo "  $HOME/rclone copy --s3-no-head --no-check-dest <local_file> <ALIAS>:<BUCKET>"
+echo "============================================================"
