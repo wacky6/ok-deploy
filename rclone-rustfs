@@ -2,7 +2,18 @@
 
 set -euo pipefail
 
+# Color text vars
+C_f='\033[0m'
+C_F_Yellow='\033[0;33m'
+C_F_Red='\033[0;31m'
+
 HOME=${HOME:-/root}
+
+# Ideally we should use rustfs-cli, but it doesn't work nicely with anonymous
+# file upload at the moment.
+#
+# So we `rclone` (which should be able to replace most of rustfs-cli or
+# minio-cli capabilities). But, we have to use slightly different syntax.
 REPO="rclone/rclone"
 
 case "$(uname -s)" in
@@ -35,14 +46,14 @@ curl -fsSL "$URL" -o "$TMPDIR/$ARCHIVE"
 unzip -q -o "$TMPDIR/$ARCHIVE" -d "$TMPDIR"
 cp "$TMPDIR/rclone-${TAG}-${OS}-${ARCH}/rclone" "$HOME/rclone"
 chmod +x "$HOME/rclone"
-echo "Installed: ~/rclone (${TAG})"
+echo -e "Installed: ${C_F_Yellow}~/rclone${C_f} (${C_F_Yellow}${TAG}${C_f})"
 
 # Add endpoints.
 add_s3_endpoint() {
     local name="$1"
     local url="$2"
-    echo "Configuring rclone S3 endpoint: $name -> $url"
-    
+    echo -e "Add rclone S3 endpoint: ${C_F_Yellow}$name${C_f} -> ${C_F_Yellow}$url${C_f}"
+
     # We set env_auth=false and no_check_bucket=true to optimize anonymous/write-only usage
     "$HOME/rclone" config create "$name" s3 \
         provider Other \
@@ -58,8 +69,8 @@ echo "============================================================"
 echo ""
 echo "============================================================"
 echo "To add Access Key (AK) and Secret Key (SK):"
-echo "  $HOME/rclone config update <ALIAS> access_key_id <AK> secret_access_key <SK>"
+echo -e "  ${C_F_Yellow}$HOME/rclone config update <ALIAS> access_key_id ${C_F_Red}<AK>${C_F_Yellow} secret_access_key ${C_F_Red}<SK>${C_f}"
 echo ""
-echo "To safely upload anonymously:"
-echo "  $HOME/rclone copy --s3-no-head --no-check-dest <local_file> <ALIAS>:<BUCKET>"
+echo -e "To safely upload anonymously (note, use ${C_F_Red}*colon*${C_f} after alias)"
+echo -e "  ${C_F_Yellow}$HOME/rclone copy --s3-no-head --no-check-dest ${C_F_Yellow}<local_file> <ALIAS>${C_F_Red}:${C_F_Yellow}<BUCKET>${C_f}"
 echo "============================================================"
