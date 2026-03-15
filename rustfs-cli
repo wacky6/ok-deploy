@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -euo pipefail
+
+HOME=${HOME:-/root}
+REPO="rustfs/cli"
+
+case "$(uname -s)" in
+    Linux)  OS="linux" ;;
+    Darwin) OS="macos" ;;
+    *)      echo "Unsupported OS: $(uname -s)"; exit 1 ;;
+esac
+
+case "$(uname -m)" in
+    x86_64)        ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *)             echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+esac
+
+RELEASE=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+ARCHIVE="rustfs-cli-${OS}-${ARCH}-${TAG}.tar.gz"
+URL=$(echo "$RELEASE" | jq -r --arg name "$ARCHIVE" '.assets[] | select(.name == $name) | .browser_download_url')
+
+if [ -z "$URL" ] || [ "$URL" = "null" ]; then
+    echo "No release asset: $ARCHIVE"
+    exit 1
+fi
+
+echo "Downloading ${ARCHIVE} ..."
+curl -fsSL "$URL" | tar xz -C "$HOME"
+echo "Installed: ~/rc (${TAG})"
+
+$HOME/rc alias set syd https://oss.syd.wacky.one '' ''
+
+echo ""
+echo "To add AK and SK, call: $HOME/rc alias set <name> <url> <AK> <SK>"
+$HOME/rc alias list
