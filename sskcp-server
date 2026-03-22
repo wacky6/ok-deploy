@@ -24,12 +24,17 @@ C_F_Yellow='\033[0;33m'
 C_F_Red='\033[0;31m'
 
 # Get KCPTUN release password.
-KEY_ID="key0@dist.wacky.one"
-echo -e "${C_F_Yellow}Release key required!${C_f}"
-echo "Enter the following key from Google Password Manager:"
-echo -n -e "  ${C_F_Red}${KEY_ID} > ${C_f}"
-read -s KCP_ZIP_PASSWORD
-echo
+if [ -n "${DIST_KEY0:-}" ]; then
+    KCP_ZIP_PASSWORD="${DIST_KEY0}"
+    echo -e "${C_F_Yellow}Release key obtained from environment.${C_f}"
+else
+    KEY_ID="key0@dist.wacky.one"
+    echo -e "${C_F_Yellow}Release key required!${C_f}"
+    echo "Enter the following key from Google Password Manager:"
+    echo -n -e "  ${C_F_Red}${KEY_ID} > ${C_f}"
+    read -s KCP_ZIP_PASSWORD
+    echo
+fi
 
 # Print error and exit
 error_and_exit() {
@@ -220,6 +225,12 @@ echo "       Mode: $KCP_MODE"
 echo "   SMux Ver: 2"
 echo "        Key: $KCP_KEY"
 echo "  TX/RX Wnd: $KCP_WND"
+
+#    Summary: Jump Host KCP
+JUMP_KCP_KEY=$( head -c 12 /dev/random | base58 )
+SSR_PORT=${SSR_LISTEN#*:}
+echo -e "${C_F_Yellow}- Jump Host:${C_f}"
+echo -e "             \$HOME/kcp_server --listen :${C_F_Yellow}${KCP_PORT}${C_f} --target ${C_F_Red}<Addr>${C_f}:$SSR_PORT --key ${C_F_Yellow}$JUMP_KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f}"
 
 # Blank line
 echo ""
