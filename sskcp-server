@@ -12,7 +12,7 @@ INSTALL_DIR="/root/${M1}"
 SSR_REPO="${M1}/${M1}-rust"
 SSR_RELEASE="latest"
 SSR_SERVER_BINARY="${M2}"
-KCP_REPO="xtaci/kcptun"
+KCP_REPO="wacky6/kcptun"
 KCP_RELEASE="latest"
 KCP_SERVER_BINARY="kcp_server"  # After rename
 
@@ -22,6 +22,14 @@ KCP_SERVER_BINARY="kcp_server"  # After rename
 C_f='\033[0m'
 C_F_Yellow='\033[0;33m'
 C_F_Red='\033[0;31m'
+
+# Get KCPTUN release password.
+KEY_ID="key0@dist.wacky.one"
+echo -e "${C_F_Yellow}Release key required!${C_f}"
+echo "Enter the following key from Google Password Manager:"
+echo -n -e "  ${C_F_Red}${KEY_ID} > ${C_f}"
+read -s KCP_ZIP_PASSWORD
+echo
 
 # Print error and exit
 error_and_exit() {
@@ -38,7 +46,7 @@ UPDATE='apt update'
 INSTALL='apt install -y'
 
 $UPDATE
-$INSTALL curl jq tar gzip bzip2 xz-utils base58 openssl
+$INSTALL curl jq tar gzip bzip2 xz-utils base58 openssl unzip
 
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
@@ -88,6 +96,20 @@ is_exec_or_die() {
     echo -e Found executable file: "$1"
 }
 
+USED_PORTS=" "
+
+gen_random_port() {
+    local port
+    while true; do
+        port=$(( RANDOM % 8192 + 1024 ))
+        if [[ "$USED_PORTS" != *" $port "* ]]; then
+            USED_PORTS+="$port "
+            eval "$1=\$port"
+            break
+        fi
+    done
+}
+
 # SS-Rust
 SSR_BIN_CRITERIA='contains("x86_64") and contains("linux") and contains("gnu") and (contains(".sha256") | not)'
 SSR_DOWNLOAD_URL=$( get_release_url "$SSR_REPO" "$SSR_RELEASE" "$SSR_BIN_CRITERIA" )
@@ -99,7 +121,8 @@ is_exec_or_die $SSR_SERVER_BINARY
 SSR_KEY=$( head -c 12 /dev/random | base58 )
 SSR_ENCRYPT="chacha20-ietf-poly1305"
 SSR_DNS="1.1.1.1,8.8.8.8"
-SSR_LISTEN="127.0.0.1:7373"
+gen_random_port SSR_PORT
+SSR_LISTEN="0.0.0.0:${SSR_PORT}"
 cat > /etc/systemd/system/${M1}.service <<_EOF_
 [Unit]
 Description=${M1U} Server
@@ -120,17 +143,22 @@ WantedBy=multi-user.target
 _EOF_
 
 # KCP
-KCP_BIN_CRITERIA='contains("amd64") and contains("linux")'
+KCP_BIN_CRITERIA='contains("amd64") and contains("linux") and contains("server")'
 KCP_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
 echo -e ${C_F_Yellow}Found release URL: ${KCP_DOWNLOAD_URL}${C_f}
-curl -L $KCP_DOWNLOAD_URL | tar -x$( extension_to_tar_flag $KCP_DOWNLOAD_URL ) --transform 's/_linux_amd64//' --transform 's/^/kcp_/'
+KCP_ZIP_TMP=$(mktemp /tmp/kcp-server-XXXXXX.zip)
+curl -L -o "$KCP_ZIP_TMP" "$KCP_DOWNLOAD_URL"
+unzip -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
+mv server_linux_amd64 $KCP_SERVER_BINARY
+chmod +x $KCP_SERVER_BINARY
+rm -f "$KCP_ZIP_TMP"
 is_exec_or_die $KCP_SERVER_BINARY
 
-KCP_WND=4096
+KCP_WND=16384
 KCP_MODE=fast3
 KCP_ENC=aes
 KCP_KEY=$( head -c 12 /dev/random | base58 )
-KCP_PORT=$(( RANDOM % 8192 + 1024 ))
+gen_random_port KCP_PORT
 cat > /etc/systemd/system/${M1}-kcp.service <<_EOF_
 [Unit]
 Description=KCP passthrough to ${M1U}
@@ -174,12 +202,12 @@ fi
 # Print Summary
 echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
 echo -e "${C_F_Yellow}- Addresses:${C_f}"
-ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }'
-ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }'
+ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }' || true
+ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }' || true
 
 #    Summary for ${M1U}
 echo -e "${C_F_Yellow}- ${M1U}:${C_f}"
-echo "       Port: $KCP_PORT"
+echo "       Port: $SSR_PORT"
 echo "        Key: $SSR_KEY"
 echo "       Algo: $SSR_ENCRYPT"
 
