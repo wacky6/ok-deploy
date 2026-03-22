@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Color text vars
+C_f='\033[0m'
+C_F_Yellow='\033[0;33m'
+C_F_Red='\033[0;31m'
+
+HOME=${HOME:-/root}
+
+# rustfs-cli lacks feature (doesn't work nicely with anonymous upload in our
+# use case), so let's use our forked mc (which is auto-sync and auto-published).
+REPO="wacky6/mc"
+
+case "$(uname -s)" in
+    Linux)  OS="linux" ;;
+    Darwin) OS="darwin" ;;
+    *)      echo "Unsupported OS: $(uname -s)"; exit 1 ;;
+esac
+
+case "$(uname -m)" in
+    x86_64)        ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *)             echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+esac
+
+RELEASE=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+ARCHIVE="mc-${OS}-${ARCH}"
+URL=$(echo "$RELEASE" | jq -r --arg name "$ARCHIVE" '.assets[] | select(.name == $name) | .browser_download_url')
+
+if [ -z "$URL" ] || [ "$URL" = "null" ]; then
+    echo "No release asset: $ARCHIVE"
+    exit 1
+fi
+
+echo "Downloading ${ARCHIVE} ..."
+curl -fsSL "$URL" -o "$HOME/mc"
+chmod +x "$HOME/mc"
+echo -e "Installed: ${C_F_Yellow}~/mc${C_f} (${C_F_Yellow}${TAG}${C_f})"
+
+# Add endpoints.
+add_s3_endpoint() {
+    local name="$1"
+    local url="$2"
+    echo -e "Add mc S3 endpoint: ${C_F_Yellow}$name${C_f} -> ${C_F_Yellow}$url${C_f}"
+
+    "$HOME/mc" alias set "$name" "$url" "" "" --api S3v4 > /dev/null 2>&1 || true
+}
+echo ""
+echo "============================================================"
+add_s3_endpoint "syd" "https://oss.syd.wacky.one"
+echo "============================================================"
+
+echo ""
+echo "============================================================"
+echo "To add Access Key (AK) and Secret Key (SK):"
+echo -e "  ${C_F_Yellow}\$HOME/mc alias set <ALIAS> <URL> ${C_F_Red}<AK> <SK>${C_f}"
+echo ""
+echo -e "To safely upload (note, use ${C_F_Red}*slash*${C_f} after alias):"
+echo -e "  ${C_F_Yellow}\$HOME/mc cp ${C_F_Yellow}<local_file> <ALIAS>${C_F_Red}/${C_F_Yellow}<BUCKET>${C_f}"
+echo "============================================================"
