@@ -26,7 +26,7 @@ C_F_Red='\033[0;31m'
 # Get KCPTUN release password.
 if [ -n "${DIST_KEY0:-}" ]; then
     KCP_ZIP_PASSWORD="${DIST_KEY0}"
-    echo -e "${C_F_Yellow}Release key obtained from environment.${C_f}"
+    echo -e "${C_F_Yellow}Using release key from environment.${C_f}"
 else
     KEY_ID="key0@dist.wacky.one"
     echo -e "${C_F_Yellow}Release key required!${C_f}"
@@ -149,10 +149,13 @@ _EOF_
 
 # KCP
 KCP_BIN_CRITERIA='contains("amd64") and contains("linux") and contains("server")'
-KCP_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
-echo -e ${C_F_Yellow}Found release URL: ${KCP_DOWNLOAD_URL}${C_f}
+KCP_SERVER_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
+KCP_CLIENT_CRITERIA='contains("amd64") and contains("linux") and contains("client")'
+KCP_CLIENT_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_CLIENT_CRITERIA" )
+echo -e ${C_F_Yellow}Found server release URL: ${KCP_SERVER_DOWNLOAD_URL}${C_f}
+echo -e ${C_F_Yellow}Found client release URL: ${KCP_CLIENT_DOWNLOAD_URL}${C_f}
 KCP_ZIP_TMP=$(mktemp /tmp/kcp-server-XXXXXX.zip)
-curl -L -o "$KCP_ZIP_TMP" "$KCP_DOWNLOAD_URL"
+curl -L -o "$KCP_ZIP_TMP" "$KCP_SERVER_DOWNLOAD_URL"
 unzip -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
 mv server_linux_amd64 $KCP_SERVER_BINARY
 chmod +x $KCP_SERVER_BINARY
@@ -206,9 +209,13 @@ fi
 
 # Print Summary
 echo -e "${C_F_Yellow}----- Config Summary -----${C_f}"
+IPV4_ADDRS=$(ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' || true)
+IPV6_ADDRS=$(ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' || true)
+
 echo -e "${C_F_Yellow}- Addresses:${C_f}"
-ip -4 a | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | awk '{ print "             "$1 }' || true
-ip -6 a | grep -oP 'inet6 \K[0-9a-fA-F:]+' | grep -vP '^(::1|fe80:)' | awk '{ print "             "$1 }' || true
+for ip in $IPV4_ADDRS $IPV6_ADDRS; do
+    echo "             $ip"
+done
 
 #    Summary for ${M1U}
 echo -e "${C_F_Yellow}- ${M1U}:${C_f}"
@@ -227,10 +234,22 @@ echo "        Key: $KCP_KEY"
 echo "  TX/RX Wnd: $KCP_WND"
 
 #    Summary: Jump Host KCP
-JUMP_KCP_KEY=$( head -c 12 /dev/random | base58 )
-SSR_PORT=${SSR_LISTEN#*:}
 echo -e "${C_F_Yellow}- Jump Host:${C_f}"
-echo -e "             \$HOME/kcp_server --listen :${C_F_Yellow}${KCP_PORT}${C_f} --target ${C_F_Red}<Addr>${C_f}:$SSR_PORT --key ${C_F_Yellow}$JUMP_KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f}"
+echo "      TMP_ZIP=\$(mktemp /tmp/kcp_client-XXXXXX.zip) && \\"
+echo "      curl -L -o \"\$TMP_ZIP\" \"$KCP_CLIENT_DOWNLOAD_URL\" && \\"
+echo "      unzip -o -P \"$KCP_ZIP_PASSWORD\" \"\$TMP_ZIP\" client_linux_amd64 && \\"
+echo "      mv client_linux_amd64 \$HOME/kcp_client && \\"
+echo "      chmod +x \$HOME/kcp_client"
+echo -e "${C_F_Yellow}  Then:${C_f}"
+for ip in $IPV4_ADDRS $IPV6_ADDRS; do
+    gen_random_port LOCAL_PORT
+    if [[ "$ip" == *:* ]]; then
+        ip_fmt="[$ip]"
+    else
+        ip_fmt="$ip"
+    fi
+    echo -e "      \$HOME/kcp_client --local :${C_F_Red}${LOCAL_PORT}${C_f} --remote ${C_F_Red}${ip_fmt}${C_f}:$KCP_PORT --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f}"
+done
 
 # Blank line
 echo ""
