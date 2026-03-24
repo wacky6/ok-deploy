@@ -14,7 +14,8 @@ SSR_RELEASE="latest"
 SSR_SERVER_BINARY="${M2}"
 KCP_REPO="wacky6/kcptun"
 KCP_RELEASE="latest"
-KCP_SERVER_BINARY="kcp_server"  # After rename
+KCP_SERVER_BINARY="kcptun_server"
+KCP_CLIENT_BINARY="kcptun_client"
 
 # Color text vars
 # This script needs to support bash, so we can't use ZSH style escape :(
@@ -30,7 +31,8 @@ if [ -n "${DIST_KEY0:-}" ]; then
 else
     KEY_ID="key0@dist.wacky.one"
     echo -e "${C_F_Yellow}Release key required!${C_f}"
-    echo "Enter the following key from Google Password Manager:"
+    echo "Set DIST_KEY0= environment variable."
+    echo "Or, enter the following key from Google Password Manager:"
     echo -n -e "  ${C_F_Red}${KEY_ID} > ${C_f}"
     read -s KCP_ZIP_PASSWORD
     echo
@@ -148,17 +150,13 @@ WantedBy=multi-user.target
 _EOF_
 
 # KCP
-KCP_BIN_CRITERIA='contains("amd64") and contains("linux") and contains("server")'
-KCP_SERVER_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
-KCP_CLIENT_CRITERIA='contains("amd64") and contains("linux") and contains("client")'
-KCP_CLIENT_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_CLIENT_CRITERIA" )
-echo -e ${C_F_Yellow}Found server release URL: ${KCP_SERVER_DOWNLOAD_URL}${C_f}
-echo -e ${C_F_Yellow}Found client release URL: ${KCP_CLIENT_DOWNLOAD_URL}${C_f}
-KCP_ZIP_TMP=$(mktemp /tmp/kcp-server-XXXXXX.zip)
-curl -L -o "$KCP_ZIP_TMP" "$KCP_SERVER_DOWNLOAD_URL"
-unzip -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
-mv server_linux_amd64 $KCP_SERVER_BINARY
-chmod +x $KCP_SERVER_BINARY
+KCP_BIN_CRITERIA='contains("amd64") and contains("linux")'
+KCP_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
+echo -e ${C_F_Yellow}Found release URL: ${KCP_DOWNLOAD_URL}${C_f}
+KCP_ZIP_TMP=$(mktemp /tmp/kcptun-XXXXXX.zip)
+curl -L -o "$KCP_ZIP_TMP" "$KCP_DOWNLOAD_URL"
+unzip -o -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
+chmod +x $KCP_SERVER_BINARY $KCP_CLIENT_BINARY
 rm -f "$KCP_ZIP_TMP"
 is_exec_or_die $KCP_SERVER_BINARY
 
@@ -235,12 +233,11 @@ echo "  TX/RX Wnd: $KCP_WND"
 
 #    Summary: Jump Host KCP
 echo -e "${C_F_Yellow}- Jump Host:${C_f}"
-echo "      TMP_ZIP=\$(mktemp /tmp/kcp_client-XXXXXX.zip) && \\"
-echo "      curl -L -o \"\$TMP_ZIP\" \"$KCP_CLIENT_DOWNLOAD_URL\" && \\"
-echo "      unzip -o -P \"$KCP_ZIP_PASSWORD\" \"\$TMP_ZIP\" client_linux_amd64 && \\"
-echo "      mv client_linux_amd64 \$HOME/kcp_client && \\"
-echo "      chmod +x \$HOME/kcp_client"
-echo -e "${C_F_Yellow}  Then:${C_f}"
+echo "      TMP_ZIP=\$(mktemp /tmp/kcptun-XXXXXX.zip) && \\"
+echo "      curl -L -o \"\$TMP_ZIP\" \"$KCP_DOWNLOAD_URL\" && \\"
+echo "      unzip -d \$HOME -o -P \"$KCP_ZIP_PASSWORD\" \"\$TMP_ZIP\" $KCP_CLIENT_BINARY $KCP_SERVER_BINARY && \\"
+echo "      chmod +x \$HOME/$KCP_CLIENT_BINARY \$HOME/$KCP_SERVER_BINARY"
+echo -e "${C_F_Yellow}  Then (split):${C_f}"
 for ip in $IPV4_ADDRS $IPV6_ADDRS; do
     gen_random_port LOCAL_PORT
     if [[ "$ip" == *:* ]]; then
@@ -248,7 +245,19 @@ for ip in $IPV4_ADDRS $IPV6_ADDRS; do
     else
         ip_fmt="$ip"
     fi
-    echo -e "      \$HOME/kcp_client --local :${C_F_Red}${LOCAL_PORT}${C_f} --remote ${C_F_Red}${ip_fmt}${C_f}:$KCP_PORT --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f}"
+    echo -e "      RIP=${C_F_Red}${ip_fmt}${C_f}; nohup \$HOME/$KCP_CLIENT_BINARY --localaddr :${C_F_Red}${LOCAL_PORT}${C_f} --remoteaddr \${RIP}:$SSR_PORT --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f} >/tmp/kcp_split_${LOCAL_PORT}.log 2>&1 & P1=\$!; sleep 1; if kill -0 \$P1 2>/dev/null; then echo -e \"\\\\033[0;32m[OK] Split listening on :${LOCAL_PORT}\\\\033[0m\"; else echo -e \"\\\\033[0;31m[ERROR] Split failed on :${LOCAL_PORT}\\\\033[0m\"; fi"
+done
+
+echo -e "${C_F_Yellow}  Then (relay):${C_f}"
+for ip in $IPV4_ADDRS $IPV6_ADDRS; do
+    gen_random_port LPORT_C
+    gen_random_port LPORT_S
+    if [[ "$ip" == *:* ]]; then
+        ip_fmt="[$ip]"
+    else
+        ip_fmt="$ip"
+    fi
+    echo -e "      RIP=${C_F_Red}${ip_fmt}${C_f}; nohup \$HOME/$KCP_SERVER_BINARY --listen :${C_F_Red}${LPORT_S}${C_f} --target 127.0.0.1:${LPORT_C} --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f} >/tmp/kcp_s_${LPORT_S}.log 2>&1 & P1=\$!; nohup \$HOME/$KCP_CLIENT_BINARY --localaddr 127.0.0.1:${LPORT_C} --remoteaddr \${RIP}:$KCP_PORT --key $KCP_KEY --crypt $KCP_ENC --mode $KCP_MODE --sndwnd $KCP_WND --rcvwnd $KCP_WND --nocomp --smuxver 2 >/tmp/kcp_c_${LPORT_C}.log 2>&1 & P2=\$!; sleep 1; if kill -0 \$P1 2>/dev/null && kill -0 \$P2 2>/dev/null; then echo -e \"\\\\033[0;32m[OK] Relay listening on :${LPORT_S}\\\\033[0m\"; else echo -e \"\\\\033[0;31m[ERROR] Relay failed on :${LPORT_S}\\\\033[0m\"; fi"
 done
 
 # Blank line
