@@ -19,19 +19,24 @@ deb [arch=i386] https://archive.ubuntu.com/ubuntu noble main universe multiverse
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-updates main universe multiverse restricted
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-backports main universe multiverse restricted
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-security main universe multiverse restricted
+deb https://archive.ubuntu.com/ubuntu resolute main universe multiverse restricted
+deb https://archive.ubuntu.com/ubuntu resolute-updates main universe multiverse restricted
+deb https://archive.ubuntu.com/ubuntu resolute-backports main universe multiverse restricted
+deb https://archive.ubuntu.com/ubuntu resolute-security main universe multiverse restricted
 clean https://archive.ubuntu.com/ubuntu
 
 # NVIDIA CUDA
-deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64 /
-clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64
 deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64 /
 clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64
+deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64 /
+clean https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64
 
 # Nginx
 deb https://nginx.org/packages/mainline/ubuntu noble nginx
+deb https://nginx.org/packages/mainline/ubuntu resolute nginx
 clean https://nginx.org/packages/mainline/ubuntu
 
 # Docker
-deb https://download.docker.com/linux/ubuntu jammy stable
 deb https://download.docker.com/linux/ubuntu noble stable
+deb https://download.docker.com/linux/ubuntu resolute stable
 clean https://download.docker.com/linux/ubuntu
