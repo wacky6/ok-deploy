@@ -49,4 +49,7 @@ popd
 
 # Archive
 mkdir -p $HOME/llama-cpp
-cp -avr build/* $HOME/llama-cpp/
+pushd build
+for dir in *; do
+  cp -avr ${dir}/bin/. $HOME/llama-cpp/${dir}
+done
