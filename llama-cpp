@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -euo pipefail
+
+cd "$(mktemp -d)"
+
+# Fetch
+git clone --depth 1 https://github.com/ggml-org/llama.cpp
+git clone --depth 1 https://github.com/flame/blis
+
+
+# blis
+pushd blis
+./configure --enable-cblas -t openmp,pthreads auto
+make -j
+make install
+popd
+
+
+# llama-cpp
+
+pushd llama.cpp
+N_JOBS=64
+
+echo "Build CPU..."
+mkdir -p ../build/cpu
+cmake -B ../build/cpu -DBUILD_SHARED_LIBS=OFF
+cmake --build ../build/cpu --config Release -j $N_JOBS
+
+if nvidia-smi > /dev/null 2>&1 ; then
+  echo "Build CUDA..."
+  export CUDACXX=/usr/local/cuda/bin/nvcc
+  mkdir -p ../build/cpu
+  cmake -B ../build/cuda -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=ON
+  cmake --build ../build/cuda --config Release -j $N_JOBS
+fi
+
+echo "Build OpenBLAS..."
+apt install libopenblas0 libopenblas-dev
+mkdir -p ../build/blas
+cmake -B ../build/blas -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS -DBUILD_SHARED_LIBS=OFF
+cmake --build ../build/blas --config Release -j $N_JOBS
+
+echo "Build BLIS..."
+mkdir -p ../build/blis
+cmake -B ../build/blis -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=FLAME -DBUILD_SHARED_LIBS=OFF
+cmake --build ../build/blis --config Release -j $N_JOBS
+popd
+
+# Archive
+mkdir -p $HOME/llama-cpp
+cp -avr build/* $HOME/llama-cpp/
