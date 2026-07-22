@@ -174,7 +174,7 @@ After=network.target
 Type=simple
 ExecStart=$INSTALL_DIR/$KCP_SERVER_BINARY \
     --listen :$KCP_PORT \
-    --target $SSR_LISTEN \
+    --target localhost:$SSR_PORT \
     --key $KCP_KEY \
     --crypt $KCP_ENC \
     --mode $KCP_MODE \
@@ -245,7 +245,7 @@ for ip in $IPV4_ADDRS $IPV6_ADDRS; do
     else
         ip_fmt="$ip"
     fi
-    echo -e "      RIP=${C_F_Red}${ip_fmt}${C_f}; nohup \$HOME/$KCP_CLIENT_BINARY --localaddr :${C_F_Red}${LOCAL_PORT}${C_f} --remoteaddr \${RIP}:$SSR_PORT --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f} >/tmp/kcp_split_${LOCAL_PORT}.log 2>&1 & P1=\$!; sleep 1; if kill -0 \$P1 2>/dev/null; then echo -e \"\\\\033[0;32m[OK] Split listening on :${LOCAL_PORT}\\\\033[0m\"; else echo -e \"\\\\033[0;31m[ERROR] Split failed on :${LOCAL_PORT}\\\\033[0m\"; fi"
+    echo -e "      RIP=${C_F_Red}${ip_fmt}${C_f}; nohup \$HOME/$KCP_CLIENT_BINARY --localaddr :${C_F_Red}${LOCAL_PORT}${C_f} --remoteaddr \${RIP}:$KCP_PORT --key ${C_F_Yellow}$KCP_KEY${C_f} --crypt ${C_F_Yellow}$KCP_ENC${C_f} --mode ${C_F_Yellow}$KCP_MODE${C_f} --sndwnd ${C_F_Yellow}$KCP_WND${C_f} --rcvwnd ${C_F_Yellow}$KCP_WND${C_f} ${C_F_Yellow}--nocomp${C_f} --smuxver ${C_F_Yellow}2${C_f} >/tmp/kcp_split_${LOCAL_PORT}.log 2>&1 & P1=\$!; sleep 1; if kill -0 \$P1 2>/dev/null; then echo -e \"\\\\033[0;32m[OK] Split listening on :${LOCAL_PORT}\\\\033[0m\"; else echo -e \"\\\\033[0;31m[ERROR] Split failed on :${LOCAL_PORT}\\\\033[0m\"; fi"
 done
 
 echo -e "${C_F_Yellow}  Then (relay):${C_f}"
