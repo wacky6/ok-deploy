@@ -1,20 +1,16 @@
 #!/bin/bash
 #
-# bbr from kernel ppa or local module
+# bbr configuration
 #
 
-
-if ! modprobe tcp_bbr; then
-    # has no bbr module, upgrade kernel
-    wget http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.14.12/linux-headers-4.14.12-041412_4.14.12-041412.201801051649_all.deb
-    wget http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.14.12/linux-headers-4.14.12-041412-generic_4.14.12-041412.201801051649_amd64.deb
-    wget http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.14.12/linux-image-4.14.12-041412-generic_4.14.12-041412.201801051649_amd64.deb
-    dpkg -i ./linux-*.deb
-    update-grub
-    rm -r ./linux-*.deb
-else
-    echo "Kernel has bbr support"
+# Check if bbr is available as a module or built-in
+if ! modprobe tcp_bbr 2>/dev/null && ! grep -q "bbr" /proc/sys/net/ipv4/tcp_allowed_congestion_control; then
+    echo "ERROR: BBR is not supported by the current kernel." >&2
+    echo "This script requires a kernel with BBR support (Ubuntu 24/26)." >&2
+    exit 1
 fi
+
+echo "Kernel has bbr support"
 
 _write_sysctl() {
     LINE=$1
@@ -28,5 +24,3 @@ _write_sysctl() {
 
 _write_sysctl net.core.default_qdisc=fq
 _write_sysctl net.ipv4.tcp_congestion_control=bbr
-# do not sysctl -p, reboot into new kernel is required to load bbr
-

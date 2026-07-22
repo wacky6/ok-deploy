@@ -68,7 +68,7 @@ get_release_url() {
     )
 
     if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
-        handle_error "No release matching criteria: ${CRITERIA}"
+        handle_error "No release matching criteria: $3"
     fi
 
     if [[ "${DOWNLOAD_URL}" =~ [[:space:]] ]]; then

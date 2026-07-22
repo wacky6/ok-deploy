@@ -26,7 +26,13 @@ Description=CPU Power Tuning
 
 [Service]
 Type=oneshot
+RemainAfterExit=true
+ExecStartPre=/usr/bin/sleep 5
 ExecStart=/usr/bin/cpupower frequency-set -g powersave
+
+# Uncomment to tune min / max CPU freq, adjust freq per platform.
+#ExecStart=/usr/bin/cpupower frequency-set -d 550Mhz
+#ExecStart=/usr/bin/cpupower frequency-set -u 1.7GHz
 
 [Install]
 WantedBy=multi-user.target
