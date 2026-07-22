@@ -61,7 +61,7 @@ get_release_url() {
     )
 
     if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
-        handle_error "No release matching criteria: ${CRITERIA}"
+        handle_error "No release matching criteria: $3"
     fi
 
     if [[ "${DOWNLOAD_URL}" =~ [[:space:]] ]]; then
@@ -143,13 +143,13 @@ WantedBy=multi-user.target
 _EOF_
 
 # KCP
-KCP_BIN_CRITERIA='contains("amd64") and contains("linux") and contains("server")'
+KCP_BIN_CRITERIA='contains("amd64") and contains("linux")'
 KCP_DOWNLOAD_URL=$( get_release_url "$KCP_REPO" "$KCP_RELEASE" "$KCP_BIN_CRITERIA" )
 echo -e ${C_F_Yellow}Found release URL: ${KCP_DOWNLOAD_URL}${C_f}
 KCP_ZIP_TMP=$(mktemp /tmp/kcp-server-XXXXXX.zip)
 curl -L -o "$KCP_ZIP_TMP" "$KCP_DOWNLOAD_URL"
-unzip -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
-mv server_linux_amd64 $KCP_SERVER_BINARY
+unzip -o -P "$KCP_ZIP_PASSWORD" "$KCP_ZIP_TMP"
+mv kcptun_server $KCP_SERVER_BINARY
 chmod +x $KCP_SERVER_BINARY
 rm -f "$KCP_ZIP_TMP"
 is_exec_or_die $KCP_SERVER_BINARY
