@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Ensure user local bin is in PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Install Antigravity CLI (agy).
+if ! command -v agy &> /dev/null; then
+    curl -fsSL https://antigravity.google/cli/install.sh | bash
+    hash -r
+else
+    echo "Antigravity CLI is already installed."
+fi
+
+# Locate the Antigravity CLI executable
+AGY_PATH=$(command -v agy)
+if [[ -z "$AGY_PATH" ]]; then
+    echo "Error: 'agy' command not found after installation."
+    exit 1
+fi
+
+echo "Found agy at: $AGY_PATH"
+
+SERVICE_FILE="/etc/systemd/system/antigravity.service"
+VM_NAME="okd-$(hostname)-$(od -vN 4 -An -tx1 /dev/urandom | tr -d ' \n')"
+
+echo "Generating systemd unit file at $SERVICE_FILE..."
+
+# Create the systemd service configured for root execution
+cat <<EOF > "$SERVICE_FILE"
+[Unit]
+Description=Google Antigravity Remote Control Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Environment="HOME=/root" "PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=$AGY_PATH remote-control start --name "$VM_NAME"
+ExecStop=$AGY_PATH remote-control stop
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Reloading systemd and enabling antigravity.service..."
+systemctl daemon-reload
+systemctl enable antigravity.service
+
+echo ""
+echo "=================================================================="
+echo "Complete sign-in flow below (open URL and paste auth code)"
+echo "=================================================================="
+echo ""
+
+# Trigger sign-in flow via print mode
+$AGY_PATH -p "echo ok" > /dev/null
+
+echo "Starting antigravity.service..."
+systemctl start antigravity.service
