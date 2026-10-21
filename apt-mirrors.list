@@ -19,10 +19,10 @@ deb [arch=i386] https://archive.ubuntu.com/ubuntu noble main universe multiverse
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-updates main universe multiverse restricted
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-backports main universe multiverse restricted
 deb [arch=i386] https://archive.ubuntu.com/ubuntu noble-security main universe multiverse restricted
-deb https://archive.ubuntu.com/ubuntu resolute main universe multiverse restricted
-deb https://archive.ubuntu.com/ubuntu resolute-updates main universe multiverse restricted
-deb https://archive.ubuntu.com/ubuntu resolute-backports main universe multiverse restricted
-deb https://archive.ubuntu.com/ubuntu resolute-security main universe multiverse restricted
+deb [arch=amd64,amd64v3] https://archive.ubuntu.com/ubuntu resolute main universe multiverse restricted
+deb [arch=amd64,amd64v3] https://archive.ubuntu.com/ubuntu resolute-updates main universe multiverse restricted
+deb [arch=amd64,amd64v3] https://archive.ubuntu.com/ubuntu resolute-backports main universe multiverse restricted
+deb [arch=amd64,amd64v3] https://archive.ubuntu.com/ubuntu resolute-security main universe multiverse restricted
 clean https://archive.ubuntu.com/ubuntu
 
 # NVIDIA CUDA
