@@ -12,5 +12,13 @@ curl -LO https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${AR
 dpkg -i cuda-keyring_1.1-1_all.deb
 rm -f cuda-keyring_1.1-1_all.deb
 
+rm -f /etc/apt/sources.list.d/cuda-${DISTRO}-${ARCH}.list
+cat > /etc/apt/sources.list.d/cuda.sources << _EOF_
+Types: deb
+URIs: https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/
+Suites: /
+Signed-By: /usr/share/keyrings/cuda-archive-keyring.gpg
+_EOF_
+
 $UPDATE
 $INSTALL nvidia-open cuda
