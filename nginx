@@ -16,9 +16,15 @@ ACME_HTTP_ROOT=/var/acme-http/
 # install nginx signing keys and configures repo
 curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
     | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
-echo "deb [arch=$( dpkg-architecture -qDEB_BUILD_ARCH ) signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
-http://nginx.org/packages/mainline/ubuntu $( lsb_release -cs ) nginx" \
-    | sudo tee /etc/apt/sources.list.d/nginx.list
+rm -f /etc/apt/sources.list.d/nginx.list
+cat > /etc/apt/sources.list.d/nginx.sources << _EOF_
+Types: deb
+URIs: http://nginx.org/packages/mainline/ubuntu
+Suites: $( lsb_release -cs )
+Components: nginx
+Architectures: $( dpkg --print-architecture )
+Signed-By: /usr/share/keyrings/nginx-archive-keyring.gpg
+_EOF_
 
 # install from official repo
 ${UPDATE}
