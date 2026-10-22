@@ -13,4 +13,4 @@ dpkg -i cuda-keyring_1.1-1_all.deb
 rm -f cuda-keyring_1.1-1_all.deb
 
 $UPDATE
-$INSTALL cuda
+$INSTALL nvidia-open cuda
