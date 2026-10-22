@@ -1,12 +1,15 @@
-# apt-mirror config for repo mirror servers
-# Use https://github.com/electricworry/apt-mirror.git to support CNF
+# For usage with apt-mirror2 with local_hash_check.
+# Currently a fork https://github.com/wacky6/apt-mirror2/tree/hash-verify
 
 set mirror_path  /mirrors/deb-repo/mirror
 set var_path     /var/apt-mirror/var
 set skel_path    /var/apt-mirror/skel
-set nthreads     4
+set nthreads     2
 set defaultarch  amd64
 set _tilde 0
+set gpg_verify off
+set weak_size_check 0
+set check_local_hash 1
 
 # BEGIN: Mirrored DEB repos
 
