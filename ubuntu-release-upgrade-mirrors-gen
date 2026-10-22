@@ -1,0 +1,160 @@
+#!/bin/bash
+#
+# Vibed by agy. Nuke if it fails :D
+#
+# ==============================================================================
+# ubuntu-release-upgrade-mirrors-gen
+#
+# Generates and stores Ubuntu release upgrade metadata and upgrader tool assets
+# for a local Ubuntu mirror service.
+#
+# Assumes Ubuntu dists and pool folders are already mirrored at STORAGE_DIR_UBUNTU.
+# This script downloads the meta-release files, rewrites upstream Canonical
+# archive URLs to point to the local mirror service, and downloads the
+# release upgrader tool packages (dist-upgrader-all tarballs and signatures)
+# so client machines can perform do-release-upgrade completely from the mirror.
+# ==============================================================================
+
+set -euo pipefail
+
+STORAGE_DIR_UBUNTU="${STORAGE_DIR_UBUNTU:-/mirrors/ubuntu}"
+MIRROR_BASE_URL="${MIRROR_BASE_URL:-https://mirrors.syd.wacky.one/ubuntu}"
+UPSTREAM_META_URL="${UPSTREAM_META_URL:-https://changelogs.ubuntu.com}"
+
+echo "========================================================"
+echo " Ubuntu Release Upgrade Mirror Generator"
+echo " Storage Directory: ${STORAGE_DIR_UBUNTU}"
+echo " Mirror Base URL:   ${MIRROR_BASE_URL}"
+echo " Upstream Meta URL: ${UPSTREAM_META_URL}"
+echo "========================================================"
+
+# Pre-flight dependencies check
+for cmd in curl python3; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: Required command '$cmd' is not installed." >&2
+    exit 1
+  fi
+done
+
+mkdir -p "${STORAGE_DIR_UBUNTU}"
+
+TMP_DIR="$(mktemp -d -t ubuntu-meta-gen-XXXXXX)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+META_FILES=(
+  "meta-release"
+  "meta-release-lts"
+  "meta-release-development"
+  "meta-release-lts-development"
+)
+
+# Process each meta-release file
+for meta_name in "${META_FILES[@]}"; do
+  upstream_file_url="${UPSTREAM_META_URL}/${meta_name}"
+  raw_file="${TMP_DIR}/${meta_name}.raw"
+
+  echo ""
+  echo ">>> Fetching ${upstream_file_url}..."
+  if ! curl -fsSL --connect-timeout 10 --retry 3 "${upstream_file_url}" -o "${raw_file}"; then
+    echo "Notice: Could not download ${upstream_file_url} (might not exist upstream). Skipping."
+    continue
+  fi
+
+  echo ">>> Processing and extracting assets for ${meta_name}..."
+
+  # Python script to parse the meta file, download required upgrader assets,
+  # and output the rewritten meta-release file.
+  python3 - <<EOF
+import os
+import re
+import subprocess
+import sys
+
+raw_file = "${raw_file}"
+storage_dir = "${STORAGE_DIR_UBUNTU}"
+mirror_base_url = "${MIRROR_BASE_URL}".rstrip("/")
+meta_name = "${meta_name}"
+rewritten_output = os.path.join(storage_dir, meta_name)
+
+with open(raw_file, "r", encoding="utf-8", errors="replace") as f:
+    content = f.read()
+
+# Parse stanzas to only extract upgrader assets for currently supported releases
+stanzas = []
+cur_stanza = {}
+for line in content.splitlines():
+    line_s = line.strip()
+    if not line_s:
+        if cur_stanza:
+            stanzas.append(cur_stanza)
+            cur_stanza = {}
+        continue
+    if ":" in line_s:
+        k, v = line_s.split(":", 1)
+        cur_stanza[k.strip()] = v.strip()
+if cur_stanza:
+    stanzas.append(cur_stanza)
+
+supported_stanzas = [s for idx, s in enumerate(stanzas) if s.get("Supported", "0") == "1" or idx == len(stanzas) - 1]
+
+asset_urls = []
+for s in supported_stanzas:
+    for key in ("UpgradeTool", "UpgradeToolSignature", "ReleaseNotes", "ReleaseNotesHtml"):
+        url = s.get(key)
+        if url and (url.startswith("http://") or url.startswith("https://")):
+            asset_urls.append(url)
+
+print(f"Found {len(asset_urls)} upgrader assets for supported/latest releases in {meta_name}.")
+for url in asset_urls:
+    # Determine the relative path under the ubuntu root
+    idx = url.find("/ubuntu/")
+    if idx != -1:
+        rel_path = url[idx + len("/ubuntu/"):]
+    else:
+        # Fallback: extract dists/... if present
+        m = re.search(r'(dists/.*)', url)
+        if m:
+            rel_path = m.group(1)
+        else:
+            rel_path = os.path.basename(url)
+
+    target_path = os.path.join(storage_dir, rel_path)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        print(f"  Asset already exists: {os.path.basename(rel_path)} (skipping)")
+        continue
+
+    print(f"  Downloading asset: {os.path.basename(rel_path)} ...")
+    cmd = [
+        "curl", "-fsSL",
+        "--connect-timeout", "10",
+        "--max-time", "60",
+        "--retry", "3",
+        "-o", target_path,
+        url
+    ]
+    res = subprocess.run(cmd)
+    if res.returncode != 0:
+        print(f"  Warning: Failed to download asset from {url}", file=sys.stderr)
+
+# Rewrite archive and security hostnames in the meta file to point to local mirror
+rewritten_content = re.sub(
+    r'https?://(?:archive|security)\.ubuntu\.com/ubuntu',
+    mirror_base_url,
+    content
+)
+
+with open(rewritten_output, "w", encoding="utf-8") as f:
+    f.write(rewritten_content)
+
+print(f"Successfully generated: {rewritten_output}")
+EOF
+
+done
+
+echo ""
+echo "========================================================"
+echo " Mirror metadata generation complete!"
+echo " Files ready in: ${STORAGE_DIR_UBUNTU}"
+echo "========================================================"

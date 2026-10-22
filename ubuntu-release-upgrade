@@ -1,0 +1,342 @@
+#!/bin/bash
+#
+# Vibed by agy. Nuke if it fails :D
+#
+# ==============================================================================
+# ubuntu-release-upgrade
+#
+# Performs unattended Ubuntu release upgrade using a local mirror service.
+#
+# Workflow:
+#  1. Configures non-interactive automation & wildcard debconf selections.
+#  2. Fetches the mirror's meta-release file to dynamically resolve the target
+#     release codename (e.g. noble -> resolute) and CUDA tag (e.g. ubuntu2404 -> ubuntu2604).
+#  3. Configures update-manager and points main OS repositories to the local mirror.
+#  4. Fully updates current release packages before invoking do-release-upgrade.
+#  5. Updates existing third-party indexes (preserving URLs, replacing codename & CUDA tags).
+#  6. Executes do-release-upgrade in non-interactive mode with --allow-third-party.
+#  7. Re-enables disabled third-party repositories and runs dist-upgrade to ensure
+#     third-party packages (Docker, Nginx, CUDA, etc.) are upgraded to target versions.
+# ==============================================================================
+
+set -euo pipefail
+
+MIRROR_BASE_URL="${MIRROR_BASE_URL:-https://mirrors.syd.wacky.one/ubuntu}"
+MIRROR_BASE_URL="${MIRROR_BASE_URL%/}"
+PROMPT_TYPE="${PROMPT_TYPE:-lts}"
+CHECK_ONLY=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --check)
+      CHECK_ONLY=true
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $0 [--check]"
+      echo "  --check   Check available target release from the local mirror without upgrading."
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Usage: $0 [--check]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Ensure running as root
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Error: This script must be run as root." >&2
+  exit 1
+fi
+
+echo "========================================================"
+echo " Ubuntu Local Mirror Release Upgrade"
+echo " Mirror Base URL: ${MIRROR_BASE_URL}"
+echo " Upgrade Mode:    Non-Interactive (Unattended)"
+echo " Prompt Type:     ${PROMPT_TYPE}"
+echo "========================================================"
+
+# 1. Non-interactive environment and wildcard debconf configuration
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export RELEASE_UPGRADER_ALLOW_THIRD_PARTY=1
+export APT_LISTCHANGES_FRONTEND=none
+
+if command -v debconf-set-selections >/dev/null 2>&1; then
+  echo "Configuring automatic service restart via debconf wildcard..."
+  echo "* libraries/restart-without-asking boolean true" | debconf-set-selections
+  echo "needrestart needrestart/mode select auto" | debconf-set-selections 2>/dev/null || true
+  echo "needrestart needrestart/ui select Needrestart::UI::stdio" | debconf-set-selections 2>/dev/null || true
+fi
+
+# Ensure required utilities are installed
+REQUIRED_PKGS=()
+for pkg in curl python3 lsb-release ubuntu-release-upgrader-core ca-certificates; do
+  if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+    REQUIRED_PKGS+=("$pkg")
+  fi
+done
+
+if [ ${#REQUIRED_PKGS[@]} -gt 0 ]; then
+  echo "Installing required upgrade utilities: ${REQUIRED_PKGS[*]}..."
+  apt-get update -y
+  apt-get install -y --no-install-recommends "${REQUIRED_PKGS[@]}"
+fi
+
+# 2. Determine current release details
+CURRENT_CODENAME="$(lsb_release -cs 2>/dev/null || grep -oP '(?<=VERSION_CODENAME=).*' /etc/os-release)"
+CURRENT_VER="$(lsb_release -rs 2>/dev/null || grep -oP '(?<=VERSION_ID=).*' /etc/os-release | tr -d '\"')"
+CURRENT_CUDA="ubuntu$(echo "${CURRENT_VER}" | tr -d . | cut -c 1-4)"
+
+echo ""
+echo ">>> Current OS Release: ${CURRENT_CODENAME} (${CURRENT_VER})"
+echo ">>> Current CUDA Tag:   ${CURRENT_CUDA}"
+
+# 3. Fetch mirror's meta-release file
+TMP_META="$(mktemp -t meta-release-XXXXXX)"
+trap 'rm -f "${TMP_META}"' EXIT
+
+META_URL="${MIRROR_BASE_URL}/meta-release"
+if [ "${PROMPT_TYPE}" = "lts" ]; then
+  META_URL="${MIRROR_BASE_URL}/meta-release-lts"
+fi
+
+echo ">>> Fetching metadata from ${META_URL}..."
+if ! curl -fsSL --connect-timeout 10 --max-time 30 --retry 3 "${META_URL}" -o "${TMP_META}"; then
+  echo "Error: Failed to fetch metadata from ${META_URL}." >&2
+  echo "Please check mirror connectivity and verify ubuntu-release-upgrade-mirrors-gen has been run on the mirror." >&2
+  exit 1
+fi
+
+# 4. Resolve target release codename & version dynamically from the meta file
+PARSE_OUTPUT="$(python3 - <<EOF
+import re
+import sys
+
+meta_file = "${TMP_META}"
+current_codename = "${CURRENT_CODENAME}".lower()
+
+with open(meta_file, "r", encoding="utf-8", errors="replace") as f:
+    text = f.read()
+
+stanzas = []
+cur_stanza = {}
+for line in text.splitlines():
+    line = line.strip()
+    if not line:
+        if cur_stanza:
+            stanzas.append(cur_stanza)
+            cur_stanza = {}
+        continue
+    if ":" in line:
+        k, v = line.split(":", 1)
+        cur_stanza[k.strip()] = v.strip()
+if cur_stanza:
+    stanzas.append(cur_stanza)
+
+# Locate current dist index
+current_idx = None
+for idx, s in enumerate(stanzas):
+    if s.get("Dist", "").lower() == current_codename:
+        current_idx = idx
+        break
+
+if current_idx is None:
+    print("CURRENT_NOT_FOUND", file=sys.stderr)
+    sys.exit(2)
+
+# Find next supported release after current (or immediately succeeding release)
+target_found = None
+for s in stanzas[current_idx + 1:]:
+    if s.get("Supported", "1") == "1" or s == stanzas[current_idx + 1]:
+        target_found = s
+        break
+
+if not target_found:
+    print("NO_TARGET_AVAILABLE", file=sys.stderr)
+    sys.exit(3)
+
+target_dist = target_found.get("Dist", "")
+ver_raw = target_found.get("Version", "")
+m = re.match(r'^([0-9]+)\.([0-9]+)', ver_raw)
+if m:
+    target_ver = f"{m.group(1)}.{m.group(2)}"
+    target_cuda = f"ubuntu{m.group(1)}{m.group(2)}"
+else:
+    target_ver = ver_raw
+    target_cuda = f"ubuntu{ver_raw.replace('.', '')[:4]}"
+
+print(f"{target_dist} {target_ver} {target_cuda}")
+EOF
+)" || parse_code=$?
+
+if [ "${parse_code:-0}" -ne 0 ]; then
+  if [ "${parse_code:-0}" -eq 3 ]; then
+    echo "Notice: System is already on the latest available release in the meta-release file."
+    exit 0
+  else
+    echo "Error: Could not resolve upgrade target for '${CURRENT_CODENAME}' from mirror metadata." >&2
+    exit 1
+  fi
+fi
+
+read -r TARGET_CODENAME TARGET_VER TARGET_CUDA <<< "${PARSE_OUTPUT}"
+
+echo ">>> Target OS Release:  ${TARGET_CODENAME} (${TARGET_VER})"
+echo ">>> Target CUDA Tag:    ${TARGET_CUDA}"
+
+if [ "${CHECK_ONLY}" = true ]; then
+  echo ""
+  echo "Check-only mode requested. Upgrade available: ${CURRENT_CODENAME} -> ${TARGET_CODENAME} (${TARGET_VER})."
+  exit 0
+fi
+
+# 5. Point /etc/update-manager/ to the local mirror
+echo ""
+echo ">>> Configuring update-manager for local mirror..."
+mkdir -p /etc/update-manager
+
+cat > /etc/update-manager/meta-release <<EOF
+# Configured by ok-deploy ubuntu-release-upgrade
+[METARELEASE]
+URI = ${MIRROR_BASE_URL}/meta-release
+URI_LTS = ${MIRROR_BASE_URL}/meta-release-lts
+URI_UNSTABLE_POSTFIX = -development
+URI_PROPOSED_POSTFIX = -proposed
+EOF
+
+cat > /etc/update-manager/release-upgrades <<EOF
+# Configured by ok-deploy ubuntu-release-upgrade
+[DEFAULT]
+Prompt=${PROMPT_TYPE}
+EOF
+
+# 6. Point main Ubuntu OS archive to local mirror
+echo ">>> Pointing main Ubuntu archive repositories to local mirror..."
+BACKUP_TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+APT_BACKUP_DIR="/var/backups/apt-sources.${BACKUP_TIMESTAMP}"
+mkdir -p "${APT_BACKUP_DIR}"
+
+if [ -f /etc/apt/sources.list ]; then
+  cp /etc/apt/sources.list "${APT_BACKUP_DIR}/sources.list"
+  sed -i -E \
+    "s@https?://([a-zA-Z0-9_-]+\.)?(archive|security)\.ubuntu\.com/ubuntu/?@${MIRROR_BASE_URL}/@g" \
+    /etc/apt/sources.list
+fi
+
+if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+  cp /etc/apt/sources.list.d/ubuntu.sources "${APT_BACKUP_DIR}/ubuntu.sources"
+  sed -i -E \
+    "s@URIs:[[:space:]]*https?://([a-zA-Z0-9_-]+\.)?(archive|security)\.ubuntu\.com/ubuntu/?@URIs: ${MIRROR_BASE_URL}/@g" \
+    /etc/apt/sources.list.d/ubuntu.sources
+fi
+
+# 7. Bring current release fully up to date
+echo ">>> Applying pending updates on current release..."
+apt-get update -y
+apt-get upgrade -y \
+  -o Dpkg::Options::="--force-confdef" \
+  -o Dpkg::Options::="--force-confold"
+
+# 8. Perform index string replacements (Codename and CUDA version) across all sources
+echo ">>> Updating existing indexes: ${CURRENT_CODENAME} -> ${TARGET_CODENAME}, ${CURRENT_CUDA} -> ${TARGET_CUDA}..."
+
+update_source_file() {
+  local src_file="$1"
+  [ -f "${src_file}" ] || return 0
+  
+  # Skip existing backups
+  case "${src_file}" in
+    *.bak*|*.distUpgrade*|*.save*) return 0 ;;
+  esac
+
+  cp "${src_file}" "${APT_BACKUP_DIR}/$(basename "${src_file}")"
+
+  # 1. Replace Ubuntu codename
+  sed -i -E "s@\b${CURRENT_CODENAME}\b@${TARGET_CODENAME}@g" "${src_file}"
+
+  # 2. Replace NVIDIA CUDA version string
+  sed -i -E "s@${CURRENT_CUDA}@${TARGET_CUDA}@g" "${src_file}"
+}
+
+if [ -f /etc/apt/sources.list ]; then
+  update_source_file /etc/apt/sources.list
+fi
+
+for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+  [ -e "$f" ] || continue
+  update_source_file "$f"
+done
+
+# 9. Execute non-interactive do-release-upgrade
+echo ""
+echo "========================================================"
+echo " Starting do-release-upgrade non-interactively..."
+echo "========================================================"
+
+do-release-upgrade \
+  -f DistUpgradeViewNonInteractive \
+  --allow-third-party \
+  --mode=server
+
+echo ""
+echo "========================================================"
+echo " Post-Upgrade: Re-enabling third-party indexes & packages"
+echo "========================================================"
+
+# Re-enable any repository lines commented out during upgrade
+re_enable_source_file() {
+  local src_file="$1"
+  [ -f "${src_file}" ] || return 0
+  case "${src_file}" in
+    *.bak*|*.distUpgrade*|*.save*) return 0 ;;
+  esac
+
+  # Remove '# disabled on upgrade to...' comments and restore deb lines (for one-line .list format)
+  sed -i -E \
+    -e 's@^[[:space:]]*#[[:space:]]*(deb(-src)?[^#]+)[[:space:]]+#[[:space:]]*disabled on upgrade to.*@\1@' \
+    -e "s@\b${CURRENT_CODENAME}\b@${TARGET_CODENAME}@g" \
+    -e "s@${CURRENT_CUDA}@${TARGET_CUDA}@g" \
+    "${src_file}"
+
+  # For deb822 (.sources format): re-enable disabled stanzas and clean comments
+  if [[ "${src_file}" == *.sources ]]; then
+    sed -i -E \
+      -e '/^[[:space:]]*#[[:space:]]*disabled on upgrade to.*/d' \
+      -e 's@^[[:space:]]*Enabled:[[:space:]]*no@Enabled: yes@g' \
+      "${src_file}"
+  fi
+}
+
+if [ -f /etc/apt/sources.list ]; then
+  re_enable_source_file /etc/apt/sources.list
+fi
+
+for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+  [ -e "$f" ] || continue
+  re_enable_source_file "$f"
+done
+
+# 10. Update and upgrade all packages from all sources (including Docker, Nginx, CUDA)
+echo ">>> Updating indexes and upgrading packages from all repositories..."
+apt-get update -y
+apt-get dist-upgrade -y \
+  -o Dpkg::Options::="--force-confdef" \
+  -o Dpkg::Options::="--force-confold"
+
+echo ">>> Cleaning up obsolete packages..."
+apt-get autoremove -y
+apt-get clean
+
+echo ""
+echo "========================================================"
+if [ -f /var/run/reboot-required ]; then
+  echo " *** UPGRADE COMPLETED: System restart is required. ***"
+  echo " Please reboot the machine to finish booting into ${TARGET_CODENAME}."
+else
+  echo " *** UPGRADE COMPLETED: System successfully upgraded to ${TARGET_CODENAME} (${TARGET_VER}). ***"
+fi
+echo "========================================================"
